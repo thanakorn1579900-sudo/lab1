@@ -478,9 +478,10 @@ const batteryRemainingDisplay=p=>{const v=batteryCapacityUnit(p)==="mAh"?battery
 const acFrequency=p=>Math.max(1,Math.min(400,Number(p.acFrequency)||50));
 const acInstantVoltage=p=>Math.max(0,Number(p.val)||0)*Math.SQRT2*Math.sin(2*Math.PI*acFrequency(p)*performance.now()/1000);
 /* Restores the configured physical capacity and voltage; this does not repair
-   a damaged battery or unrelated fault, it only clears the empty-battery cut-off. */
+   a damaged battery or unrelated fault.  The Settings-panel control may be
+   used at any time, while the Canvas shortcut remains an empty-battery aid. */
 function rechargeBattery(p){
- if(!p||p.type!=="BATT"||!batteryIsEmpty(p))return false;
+ if(!p||p.type!=="BATT")return false;
  snap();
  p.remainingAh=batteryCapacityAh(p);
  p.batteryEmpty=false;p.batteryEmptyAlerted=false;p.outputCurrent=0;
@@ -488,7 +489,7 @@ function rechargeBattery(p){
  p.openVoltage=batteryOpenVoltage(p);p.currentLimited=false;p.overloadAlerted=false;
  if(S().batteryAlert?.partId===p.id)S().batteryAlert=null;
  lastBatteryTick=0;running=true;
- showToast(`🔋 ชาร์จแบตเตอรี่ ${p.id} เต็ม 100% แล้ว — เริ่มคำนวณวงจรใหม่`);
+ showToast(`🔋 รีเซ็ตแบตเตอรี่ ${p.id} เป็น 100% แล้ว — เริ่มคำนวณวงจรใหม่`);
  render();
  return true;
 }
@@ -3069,7 +3070,7 @@ function buildInspector(){
     กำลังขาออก: <b id="battActualP">${fmtW(p.actualPower||0)}</b><br>
     ความจุคงเหลือ: <b id="battRemaining">${batteryRemainingDisplay(p)}</b><br>
     SOC: <b id="battSoc">${batterySoc(p).toFixed(1)}%</b> • OCV <b id="battOcv">${fmtV(batteryOpenVoltage(p))}</b></div>
-   <div class="fld" style="margin-bottom:0">${batteryIsEmpty(p)?'<button class="tb" id="battRecharge" type="button" style="padding:5px 8px">↻ ชาร์จใหม่ 100%</button>':''}<span id="battState" style="font-size:10.5px;color:${batteryIsEmpty(p)?"#b42318":"#0a7d3f"}">${batteryIsEmpty(p)?"แบตหมด — กดปุ่มชาร์จใหม่บน Canvas":"พร้อมจ่ายไฟ"}</span></div></div>`;
+   <div class="fld" style="margin-bottom:0;align-items:center;gap:7px"><button class="tb" id="battRecharge" type="button" title="คืนความจุแบตเตอรี่เป็น 100%" style="padding:5px 8px;white-space:nowrap">↻ รีเซ็ตแบตเตอรี่</button><span id="battState" style="font-size:10.5px;color:${batteryIsEmpty(p)?"#b42318":"#0a7d3f"}">${batteryIsEmpty(p)?"แบตหมด — กดรีเซ็ตเพื่อชาร์จเต็ม":"พร้อมจ่ายไฟ"}</span></div></div>`;
  }
  if(p.type==="RES"){
   const bands=resistorBandSet(p),count=bands.length,ratio=(Number(p.actualPower)||0)/resistorRatedPower(p);
