@@ -132,11 +132,85 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 #zoomPct:hover{background:#eaf2ff}
 #zoomPct:active{background:#d6e6ff}
 #zoomPct .zm-ico{font-size:15px;line-height:1}
+
+/* ═══ Mobile canvas-first layout ═══
+   Desktop styles above remain unchanged.  On phones, the circuit board stays
+   full-width while the two information panels become off-canvas overlays. */
+#mobilePanelBackdrop,#mobilePanelActions,.mobile-panel-close{display:none}
+@media (max-width:768px){
+  body{overflow:hidden}
+  #slidebar{height:48px;flex:0 0 48px;gap:6px;padding:0 8px;overflow-x:auto;overflow-y:hidden}
+  #slidebar #thumbs{gap:6px !important}
+  #slidebar .thumb{width:64px;height:38px}
+  #slidebar .thumb b{right:3px;font-size:9px}
+  #slidebar .thumb-close{width:16px;height:16px;font-size:13px;line-height:14px}
+  #slidebar .tb{padding:5px 8px;font-size:11px;flex:none}
+
+  /* Keep secondary commands available by horizontal swipe, but lift Run/Stop
+     out of this row so it is always available over the board. */
+  #toolbar{height:44px;flex:0 0 44px;gap:5px;padding:0 8px;overflow-x:auto;overflow-y:hidden;
+           flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  #toolbar .tb,#toolbar .sep,#toolbar label,#toolbar select{flex:none}
+  #toolbar .tb{padding:6px 9px;font-size:11px}
+  #toolbar .sep{margin:0 1px}
+  #toolbar #btnRun{position:fixed;right:12px;bottom:76px;z-index:1002;display:flex;align-items:center;
+                   min-height:44px;padding:0 13px;border-radius:22px;box-shadow:0 5px 16px rgba(23,35,52,.25)}
+
+  /* Device palette: one touch-scrollable line, never a wrapped grid. */
+  #palette{height:80px;flex:0 0 80px;width:100%;padding:5px 8px;gap:6px;overflow-x:auto;overflow-y:hidden;
+           flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+           scroll-snap-type:x proximity}
+  #palette .pi{width:72px;height:68px;flex:0 0 72px;gap:1px;scroll-snap-align:start}
+  #palette .pi .ic{height:34px}
+  #palette .pi .ic svg{width:40px;height:34px}
+  #palette .pi .nm{font-size:9px;line-height:1.1}
+
+  /* The board receives at least 65% of the viewport height and cannot be
+     narrowed by either panel.  dvh provides the right size around mobile UI. */
+  #body{display:block;position:relative;flex:1 0 65vh;min-height:65vh;min-height:65dvh;width:100%;overflow:hidden}
+  #stageWrap{width:100%;height:100%;min-height:65vh;min-height:65dvh;overflow:hidden;background:#c9cf52}
+  #stage{width:100%;height:100%}
+  #stageBg{fill:#c9cf52}
+  #hud{left:10px;right:10px;bottom:128px;max-width:calc(100% - 20px);padding:8px 10px;font-size:11px}
+
+  /* Side panels slide over the canvas instead of taking layout space. */
+  #side,#dock{position:fixed;top:0;bottom:0;height:100vh;height:100dvh;z-index:1201;visibility:hidden;
+              pointer-events:none;transition:transform .24s ease,visibility 0s linear .24s;
+              box-shadow:0 12px 32px rgba(15,23,42,.30)}
+  #side{width:min(88vw,380px);padding:56px 10px 12px;transform:translateX(-105%);border-right:0}
+  #dock{width:min(94vw,440px);padding-top:52px;transform:translateX(105%);border-left:0}
+  #side.is-open,#dock.is-open{visibility:visible;pointer-events:auto;transform:translateX(0);
+                              transition:transform .24s ease,visibility 0s}
+  #dock .tabs{padding-right:52px}
+  .mobile-panel-close{display:flex;position:absolute;top:10px;right:10px;z-index:2;width:36px;height:36px;
+                      align-items:center;justify-content:center;border:0;border-radius:50%;background:#fff;color:#2c3e50;
+                      box-shadow:0 2px 8px rgba(23,35,52,.18);font-size:25px;line-height:1;cursor:pointer}
+  .mobile-panel-close:active{background:#d6e6ff}
+  #mobilePanelBackdrop{display:block;position:fixed;inset:0;z-index:1200;border:0;background:rgba(15,23,42,.42);
+                        opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility 0s linear .2s}
+  #mobilePanelBackdrop.is-visible{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .2s,visibility 0s}
+
+  /* Shortcuts to the overlays stay within thumb reach without covering the
+     device palette.  Zoom and Run/Stop remain floating over the canvas. */
+  #mobilePanelActions{display:flex;position:fixed;top:184px;left:10px;z-index:1002;gap:7px}
+  #mobilePanelActions button{min-height:40px;border:0;border-radius:20px;padding:0 11px;background:rgba(255,255,255,.95);
+                             color:#273444;font-family:inherit;font-size:11px;font-weight:700;box-shadow:0 4px 12px rgba(23,35,52,.22)}
+  #mobilePanelActions button:active{background:#d6e6ff}
+  #zoomPanel{top:auto;right:10px;bottom:12px;z-index:1002;padding:3px}
+  #zoomPanel .zb{width:40px;height:40px;min-width:40px;min-height:40px}
+  #zoomPct{min-width:64px;min-height:40px;padding:0 7px}
+  #toast{right:10px;bottom:132px;left:10px;max-width:none}
+}
 </style>
 </head>
 <body>
 
 <div id="toast" role="alert" aria-live="assertive"></div>
+<button type="button" id="mobilePanelBackdrop" aria-label="ปิดแผงเครื่องมือ"></button>
+<div id="mobilePanelActions" aria-label="เปิดแผงเครื่องมือ">
+  <button type="button" id="btnOpenSide" aria-controls="side" aria-expanded="false">☰ ทางลัด</button>
+  <button type="button" id="btnOpenDock" aria-controls="dock" aria-expanded="false">🔧 เครื่องมือวัด</button>
+</div>
 
 <!-- ═══ Zoom Controls (fixed มุมขวาบน) ═══ -->
 <div id="zoomPanel" role="toolbar" aria-label="ควบคุมการซูม">
@@ -173,6 +247,7 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 
 <div id="body">
   <aside id="side">
+    <button type="button" class="mobile-panel-close" data-close-panel="side" aria-label="ปิดทางลัด">×</button>
     <h3>SLIDES</h3><div class="sbox" id="slideList" style="font-size:11.5px;color:#6b7784"></div>
     <h3>ทางลัด</h3>
     <div class="sbox">
@@ -208,6 +283,7 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   </div>
 
   <aside id="dock">
+    <button type="button" class="mobile-panel-close" data-close-panel="dock" aria-label="ปิดเครื่องมือวัด">×</button>
     <div class="tabs">
       <div class="tab on" data-p="dmm">🔧 มัลติมิเตอร์</div>
       <div class="tab" data-p="scope">📈 สโคป</div>
@@ -1777,6 +1853,46 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
  document.querySelectorAll(".pane").forEach(x=>x.classList.remove("on"));
  t.classList.add("on");$("pane-"+t.dataset.p).classList.add("on");});
+
+/* Mobile panels: these remain ordinary desktop sidebars above 768 px.  At
+   smaller widths a single panel can slide over the board and is dismissible
+   by its X button, the backdrop, or Escape. */
+const mobileLayoutQuery=window.matchMedia("(max-width: 768px)");
+const mobilePanelIds=["side","dock"];
+function syncMobilePanels(){
+ const isMobile=mobileLayoutQuery.matches;
+ mobilePanelIds.forEach(id=>{
+  const panel=$(id),toggle=$(id==="side"?"btnOpenSide":"btnOpenDock");
+  if(!panel||!toggle)return;
+  if(!isMobile)panel.classList.remove("is-open");
+  const isOpen=isMobile&&panel.classList.contains("is-open");
+  panel.setAttribute("aria-hidden",String(isMobile&&!isOpen));
+  toggle.setAttribute("aria-expanded",String(isOpen));
+ });
+ const backdrop=$("mobilePanelBackdrop");
+ const hasOpen=isMobile&&mobilePanelIds.some(id=>$(id)?.classList.contains("is-open"));
+ backdrop.classList.toggle("is-visible",hasOpen);
+ backdrop.setAttribute("aria-hidden",String(!hasOpen));
+}
+function setMobilePanel(id,open){
+ if(!mobileLayoutQuery.matches)return;
+ mobilePanelIds.forEach(panelId=>$(panelId)?.classList.toggle("is-open",open&&panelId===id));
+ syncMobilePanels();
+ if(open)$(id)?.querySelector(".mobile-panel-close")?.focus();
+}
+$("btnOpenSide").addEventListener("click",()=>setMobilePanel("side",!$("side").classList.contains("is-open")));
+$("btnOpenDock").addEventListener("click",()=>setMobilePanel("dock",!$("dock").classList.contains("is-open")));
+document.querySelectorAll("[data-close-panel]").forEach(button=>button.addEventListener("click",()=>setMobilePanel(button.dataset.closePanel,false)));
+$("mobilePanelBackdrop").addEventListener("click",()=>{mobilePanelIds.forEach(id=>$(id).classList.remove("is-open"));syncMobilePanels();});
+document.addEventListener("keydown",event=>{
+ if(event.key!=="Escape"||!mobileLayoutQuery.matches)return;
+ const openPanel=mobilePanelIds.find(id=>$(id).classList.contains("is-open"));
+ if(openPanel){setMobilePanel(openPanel,false);$(openPanel==="side"?"btnOpenSide":"btnOpenDock").focus();}
+});
+if(mobileLayoutQuery.addEventListener)mobileLayoutQuery.addEventListener("change",syncMobilePanels);
+else mobileLayoutQuery.addListener(syncMobilePanels);
+syncMobilePanels();
+
 function pinLabel(pid){if(!pid)return"—";
  if(pid==="CHASSIS")return"ตัวถัง (CHASSIS)";if(pid==="BATT+")return"แบต +";
  const[i,pn]=pid.split(".");const p=findP(i);if(!p)return pid;
