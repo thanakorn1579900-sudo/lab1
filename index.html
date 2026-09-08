@@ -56,6 +56,7 @@ body{font-family:Tahoma,"Segoe UI",sans-serif;background:#eef1f5;color:#2c3e50;
 #stageWrap::-webkit-scrollbar-track{background:#e1e7dc;border-radius:8px}
 #stageWrap::-webkit-scrollbar-thumb{background:#8a9a71;border:3px solid #e1e7dc;border-radius:9px}
 #stageWrap::-webkit-scrollbar-thumb:hover{background:#61754b}
+#mobileWorkspaceScrollbars{display:none}
 #hud{position:absolute;left:12px;bottom:12px;background:rgba(20,26,33,.9);color:#fff;
      padding:9px 14px;border-radius:8px;font-size:12px;font-weight:700;max-width:70%}
 #hud.ok{background:rgba(13,62,36,.93);color:#7ee787}
@@ -109,6 +110,14 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 .realistic-diode .diode-pin{cursor:crosshair}
 .component-title{pointer-events:none;paint-order:stroke;stroke:#f7fafc;stroke-width:4px;stroke-linejoin:round}
 .component-pin-label{pointer-events:none;paint-order:stroke;stroke:#f7fafc;stroke-width:3px;stroke-linejoin:round}
+.ecu-pin-label-box{overflow:visible;pointer-events:none}
+.ecu-pin-label{display:flex;flex-direction:column;align-items:center;text-align:center;white-space:nowrap;
+               color:#344454;font-family:Tahoma,"Segoe UI",sans-serif;font-size:8.5px;font-weight:700;line-height:1.08}
+.ecu-pin-label .sensor{font-size:7px;font-weight:600;color:#637487;margin-top:1px}
+.relay-pin-label-box{overflow:visible;pointer-events:none}
+.relay-pin-label{display:flex;flex-direction:column;align-items:center;text-align:center;white-space:nowrap;
+                 color:#344454;font-family:Tahoma,"Segoe UI",sans-serif;font-size:8.5px;font-weight:700;line-height:1.08}
+.relay-pin-label .terminal-number{font-size:7.3px;font-weight:700;color:#7a5b18;margin-top:1px}
 .component-settings{cursor:pointer}
 .component-settings:hover .component-settings-bg{fill:#1f6feb;stroke:#fff}
 @keyframes currentFlow{to{stroke-dashoffset:-15}}
@@ -181,9 +190,21 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   #palette .pi .nm{font-size:9px;line-height:1.1}
   #body{display:block;position:relative;flex:1 0 65vh;min-height:65vh;min-height:65dvh;width:100%;overflow:hidden}
   #stageWrap{width:100%;height:100%;min-height:65vh;min-height:65dvh;overflow:auto;background:#c9cf52;
-             -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+             -webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none;-ms-overflow-style:none}
+  #stageWrap::-webkit-scrollbar{width:0;height:0}
   #stage{width:3000px;height:2200px;max-width:none}
   #stageBg{fill:#c9cf52}
+  /* Mobile browsers commonly hide native scrollbars.  These two responsive
+     rails remain visible, mirror the real scroll position, and are draggable. */
+  #mobileWorkspaceScrollbars{display:block;position:absolute;inset:0;z-index:1001;pointer-events:none}
+  .workspace-scroll-track{position:absolute;pointer-events:auto;background:rgba(241,246,235,.84);border:1px solid rgba(67,84,52,.42);
+                          border-radius:10px;box-shadow:0 1px 4px rgba(24,37,26,.18);touch-action:none}
+  .workspace-scroll-track.vertical{top:8px;right:4px;bottom:22px;width:14px}
+  .workspace-scroll-track.horizontal{left:4px;right:22px;bottom:4px;height:14px}
+  .workspace-scroll-thumb{position:absolute;min-width:34px;min-height:34px;border-radius:9px;background:#637b4f;
+                          box-shadow:inset 0 0 0 1px rgba(255,255,255,.52);cursor:grab;touch-action:none}
+  .workspace-scroll-thumb:active{cursor:grabbing;background:#405d31}
+  .workspace-scroll-track:not(.is-needed){opacity:0;pointer-events:none}
   #hud{left:10px;right:10px;bottom:128px;max-width:calc(100% - 20px);padding:8px 10px;font-size:11px}
   #side,#dock{position:fixed;top:0;bottom:0;height:100vh;height:100dvh;z-index:1201;visibility:hidden;
               pointer-events:none;transition:transform .24s ease,visibility 0s linear .24s;
@@ -289,6 +310,10 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
       </g>
     </svg>
     <div id="hud" class="bad">วางกล่อง ECU และเซ็นเซอร์ แล้วลากสายเชื่อมขาให้ถูกต้อง</div>
+  </div>
+  <div id="mobileWorkspaceScrollbars" aria-label="แถบเลื่อนพื้นที่ทำงาน">
+    <div class="workspace-scroll-track vertical" id="workspaceScrollY"><div class="workspace-scroll-thumb" id="workspaceThumbY"></div></div>
+    <div class="workspace-scroll-track horizontal" id="workspaceScrollX"><div class="workspace-scroll-thumb" id="workspaceThumbX"></div></div>
   </div>
 
   <aside id="dock">
@@ -508,8 +533,8 @@ const DEF={
   pins:[["A","ขา A","#c9a06a"],["B","ขา B","#9aa5b1"]]},
  FAN:{nm:"พัดลม",ic:"🌀",w:132,fill:"#333b44",head:"#262d35",
   pins:[["A","ขา A (+)","#e06c75"],["B","ขา B (−)","#9aa5b1"]]},
- RELAY:{nm:"รีเลย์ 5 ขา (5-Pin Relay)",ic:"🧲",w:172,fill:"#2f4536",head:"#223228",
-  pins:[["COIL+","ขา 86 คอยล์ +","#e06c75"],["COIL-","ขา 85 คอยล์ −","#9aa5b1"],
+ RELAY:{nm:"รีเลย์",ic:"🧲",w:172,fill:"#2f4536",head:"#223228",
+  pins:[["COIL+","ขา 85 คอยล์ +","#e06c75"],["COIL-","ขา 86 คอยล์ −","#9aa5b1"],
         ["COM","ขา 30 COMMON","#f0c36b"],["NO","ขา 87 (NO)","#98c379"],
         ["NC","ขา 87a (NC)","#e06c75"]]},
  PSU:{nm:"แหล่งจ่ายไฟ (Power Supply)",ic:"🔌",w:170,fill:"#38414d",head:"#222a33",
@@ -555,7 +580,7 @@ const ELECTRICAL={
  DIODE:"1N4007: Vf ≈ 0.7 V, กระแสต่อเนื่องสูงสุด 1 A, ทนแรงดันย้อนกลับ 1000 V",
  BULB:"กำหนดพิกัด V/W ได้; R ขณะร้อนคำนวณจาก R = V² / P", BUZZ:"บัซเซอร์ 12 V / 30 mA (≈ 400 Ω)",
  BELL:"กระดิ่ง 12 V (≈ 160 Ω)", FAN:"มอเตอร์พัดลม 12 V / 0.15 A (≈ 80 Ω)",
- RELAY:"รีเลย์ 5 ขา — คอยล์ 12 V/400 Ω (ขา 85-86) ดูดเมื่อ ≥9 V; ขา 30(COM) สลับไปหา ขา 87(NO) เมื่อคอยล์ทำงาน และกลับไปหา ขา 87a(NC) เมื่อคอยล์ไม่ทำงาน",
+ RELAY:"รีเลย์ — คอยล์ 12 V/400 Ω (ขา 85-86) ดูดเมื่อ ≥9 V; ขา 30(COM) สลับไปหา ขา 87(NO) เมื่อคอยล์ทำงาน และกลับไปหา ขา 87a(NC) เมื่อคอยล์ไม่ทำงาน",
  XFMR:"หม้อแปลงแบบแยกขด — ไม่ส่งผ่าน DC", NPN:"ทรานซิสเตอร์ NPN ซิลิคอน (VBE ≈ 0.7 V)", NMOS:"N-channel MOSFET", TRIAC:"TRIAC สำหรับ AC"};
 /* กราฟความต่อเนื่อง (ใช้ตรวจว่าจุดใดมีไฟถึงบ้าง สำหรับ LED/บัซเซอร์/หลอด/สโคป ฯลฯ) */
 const INTERNAL_EDGES={RES:[["A","B"]],LDR:[["A","B"]],POT:[["1","2"],["1","W"],["W","2"]],
@@ -725,6 +750,7 @@ function applyViewportTransform(){
   if(viewport)viewport.setAttribute("transform",`translate(${panX},${panY}) scale(${zoomScale})`);
   /* Keep the scrollable SVG root large enough for the scaled drawing. */
   if(stage){stage.style.width=`${WORKSPACE_WIDTH*zoomScale}px`;stage.style.height=`${WORKSPACE_HEIGHT*zoomScale}px`;}
+  if(typeof syncWorkspaceScrollbars==="function")requestAnimationFrame(syncWorkspaceScrollbars);
   const pct=$("zoomPctVal"); if(pct)pct.textContent=Math.round(zoomScale*100)+"%";
   const out=$("btnZoomOut"), inn=$("btnZoomIn");
   if(out)out.disabled=zoomIdx<=0;
@@ -792,7 +818,7 @@ function pinsFor(p){
  return p.type==="RELAY"&&relayType(p)==="SPST"?pins.filter(pin=>pin[0]!=="NC"):pins;
 }
 function componentName(p){
- if(p.type==="RELAY")return relayType(p)==="SPST"?"รีเลย์ 4 ขา (SPST)":"รีเลย์ 5 ขา (SPDT)";
+ if(p.type==="RELAY")return "รีเลย์";
  return DEF[p.type]?.nm||p.type;
 }
 function hasConfigurableSettings(p){
@@ -842,6 +868,25 @@ function nearestConnectablePin(point){
 const NS="http://www.w3.org/2000/svg";
 function mk(t,a,x){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);
  if(x!==undefined)e.textContent=x;return e;}
+const ECU_PIN_SENSOR={"SIG-A":"ECT","SIG-B":"TPS","SIG-C":"CKP","SIG-D":"IAT","SIG-E":"MAP"};
+/* foreignObject lets ECU labels use the same centred flex-column layout as
+   the rest of the HTML UI while staying attached to the SVG terminal. */
+function appendEcuPinLabel(parent,terminal,pinName){
+ const box=mk("foreignObject",{class:"ecu-pin-label-box",x:terminal.x-15,y:terminal.y+13,width:30,height:31});
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="ecu-pin-label";
+ const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const sensor=ECU_PIN_SENSOR[pinName];
+ if(sensor){const sub=document.createElement("span");sub.className="sensor";sub.textContent=`(${sensor})`;label.appendChild(sub);}
+ box.appendChild(label);parent.appendChild(box);
+}
+const RELAY_PIN_NUMBER={"COIL+":"85","COIL-":"86","COM":"30","NO":"87","NC":"87a"};
+function appendRelayPinLabel(parent,terminal,pinName){
+ const box=mk("foreignObject",{class:"relay-pin-label-box",x:terminal.x-18,y:terminal.y+13,width:36,height:31});
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="relay-pin-label";
+ const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const number=document.createElement("span");number.className="terminal-number";number.textContent=RELAY_PIN_NUMBER[pinName]||"";label.appendChild(number);
+ box.appendChild(label);parent.appendChild(box);
+}
 const instrDmm=mk("g",{id:"instrDmm"});instrL.appendChild(instrDmm);
 const instrScope=mk("g",{id:"instrScope"});instrL.appendChild(instrScope);
 const curveD=(a,b)=>`M ${a.x} ${a.y} C ${a.x+70} ${a.y}, ${b.x-70} ${b.y}, ${b.x} ${b.y}`;
@@ -1143,7 +1188,9 @@ function render(){
       const c=mk("circle",{cx:terminal.x,cy:terminal.y,r:8,fill:pn[2],stroke:"#12161b","stroke-width":2,class:"pin"});
       c.dataset.pid=p.id+"."+pn[0];
       c.appendChild(mk("title",{},`${p.id}.${pn[0]} — ${pn[1]}`));g.appendChild(c);
-      g.appendChild(mk("text",{class:"component-pin-label",x:terminal.x,y:terminal.y+20,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#344454"},pn[0]));});
+      if(p.type==="ECU")appendEcuPinLabel(g,terminal,pn[0]);
+      else if(p.type==="RELAY")appendRelayPinLabel(g,terminal,pn[0]);
+      else g.appendChild(mk("text",{class:"component-pin-label",x:terminal.x,y:terminal.y+20,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#344454"},pn[0]));});
     if(hasConfigurableSettings(p)){
       const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"}),gx=d.w/2+38,gy=11;
       gear.appendChild(mk("circle",{class:"component-settings-bg",cx:gx,cy:gy,r:11,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));
@@ -2420,6 +2467,56 @@ updateAudioButton();
 /* Scroll only the workspace: wheel = vertical, Shift+wheel = horizontal.
    Hold Ctrl while using the wheel when zooming around the pointer is wanted. */
 const stageWrapEl=$("stageWrap");
+const workspaceScrollY=$("workspaceScrollY"),workspaceScrollX=$("workspaceScrollX");
+const workspaceThumbY=$("workspaceThumbY"),workspaceThumbX=$("workspaceThumbX");
+function syncWorkspaceScrollbars(){
+ if(!stageWrapEl)return;
+ const sync=(axis,track,thumb)=>{
+  if(!track||!thumb)return;
+  const viewport=axis==="y"?stageWrapEl.clientHeight:stageWrapEl.clientWidth;
+  const content=axis==="y"?stageWrapEl.scrollHeight:stageWrapEl.scrollWidth;
+  const current=axis==="y"?stageWrapEl.scrollTop:stageWrapEl.scrollLeft;
+  const trackSize=axis==="y"?track.clientHeight:track.clientWidth;
+  const needed=content>viewport+1&&trackSize>0;
+  track.classList.toggle("is-needed",needed);
+  if(!needed)return;
+  const thumbSize=Math.min(trackSize,Math.max(34,trackSize*viewport/content));
+  const remaining=Math.max(0,trackSize-thumbSize),maxScroll=Math.max(1,content-viewport);
+  const position=remaining*(current/maxScroll);
+  if(axis==="y"){thumb.style.height=`${thumbSize}px`;thumb.style.width="100%";thumb.style.transform=`translateY(${position}px)`;}
+  else{thumb.style.width=`${thumbSize}px`;thumb.style.height="100%";thumb.style.transform=`translateX(${position}px)`;}
+ };
+ sync("y",workspaceScrollY,workspaceThumbY);sync("x",workspaceScrollX,workspaceThumbX);
+}
+function bindWorkspaceScrollbar(axis,track,thumb){
+ if(!stageWrapEl||!track||!thumb)return;
+ const scrollToPointer=e=>{
+  const rect=track.getBoundingClientRect(),trackSize=axis==="y"?rect.height:rect.width;
+  const thumbSize=axis==="y"?thumb.getBoundingClientRect().height:thumb.getBoundingClientRect().width;
+  const pointer=axis==="y"?e.clientY-rect.top:e.clientX-rect.left;
+  const ratio=Math.max(0,Math.min(1,(pointer-thumbSize/2)/Math.max(1,trackSize-thumbSize)));
+  if(axis==="y")stageWrapEl.scrollTop=ratio*Math.max(0,stageWrapEl.scrollHeight-stageWrapEl.clientHeight);
+  else stageWrapEl.scrollLeft=ratio*Math.max(0,stageWrapEl.scrollWidth-stageWrapEl.clientWidth);
+ };
+ track.addEventListener("pointerdown",e=>{if(e.target===thumb)return;e.preventDefault();scrollToPointer(e);});
+ thumb.addEventListener("pointerdown",e=>{
+  e.preventDefault();e.stopPropagation();const start=axis==="y"?e.clientY:e.clientX;
+  const startScroll=axis==="y"?stageWrapEl.scrollTop:stageWrapEl.scrollLeft;
+  const trackSize=axis==="y"?track.clientHeight:track.clientWidth;
+  const thumbSize=axis==="y"?thumb.getBoundingClientRect().height:thumb.getBoundingClientRect().width;
+  const scrollRange=Math.max(0,(axis==="y"?stageWrapEl.scrollHeight-stageWrapEl.clientHeight:stageWrapEl.scrollWidth-stageWrapEl.clientWidth));
+  const move=ev=>{const point=axis==="y"?ev.clientY:ev.clientX,ratio=(point-start)/Math.max(1,trackSize-thumbSize);
+    if(axis==="y")stageWrapEl.scrollTop=startScroll+ratio*scrollRange;else stageWrapEl.scrollLeft=startScroll+ratio*scrollRange;};
+  thumb.setPointerCapture(e.pointerId);thumb.addEventListener("pointermove",move);
+  thumb.addEventListener("pointerup",()=>thumb.removeEventListener("pointermove",move),{once:true});
+  thumb.addEventListener("pointercancel",()=>thumb.removeEventListener("pointermove",move),{once:true});
+ });
+}
+bindWorkspaceScrollbar("y",workspaceScrollY,workspaceThumbY);
+bindWorkspaceScrollbar("x",workspaceScrollX,workspaceThumbX);
+stageWrapEl?.addEventListener("scroll",syncWorkspaceScrollbars,{passive:true});
+window.addEventListener("resize",syncWorkspaceScrollbars);
+requestAnimationFrame(syncWorkspaceScrollbars);
 if(stageWrapEl){
   stageWrapEl.addEventListener("wheel",e=>{
     if(e.ctrlKey){
