@@ -88,8 +88,13 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 .wire-flow.live{opacity:.95;animation:currentFlow .74s linear infinite}
 .wire-flow.reverse{animation-direction:reverse}
 .wire-terminal{stroke:#111820;stroke-width:1.2;pointer-events:none}
-.canvas-delete{cursor:pointer}
-.canvas-delete-bg{fill:#b42318;stroke:#fff;stroke-width:1.6}
+.device-card,#selectionL{overflow:visible}
+/* SVG components use transforms rather than CSS box positioning.  The delete
+   control is rendered in #selectionL (the final, top-most SVG layer), so it
+   can sit beyond the component frame without being clipped or covered. */
+.canvas-delete{cursor:pointer;pointer-events:all;position:absolute;z-index:100}
+.component-delete{overflow:visible}
+.canvas-delete-bg{fill:#b42318;stroke:#fff;stroke-width:1.8}
 .canvas-delete:hover .canvas-delete-bg,.canvas-delete:focus .canvas-delete-bg{fill:#e3342f;stroke:#fff6c7;stroke-width:2.2}
 @keyframes currentFlow{to{stroke-dashoffset:-15}}
 /* ═══ มัลติมิเตอร์ดิจิตอล ═══ */
@@ -909,7 +914,7 @@ function bezMid(a,b){ // จุดกึ่งกลางของเส้น�
    เพื่อให้กดได้แม้มีสาย/อุปกรณ์อื่นซ้อนอยู่ด้านล่าง */
 function canvasDeleteButton(x,y,label,onDelete){
   const b=mk("g",{class:"canvas-delete no-drag",transform:`translate(${x},${y})`,role:"button",tabindex:"0","aria-label":label});
-  b.appendChild(mk("circle",{class:"canvas-delete-bg",cx:0,cy:0,r:9}));
+  b.appendChild(mk("circle",{class:"canvas-delete-bg",cx:0,cy:0,r:10}));
   b.appendChild(mk("text",{x:0,y:4,"text-anchor":"middle","font-size":14,"font-weight":700,fill:"#fff","pointer-events":"none"},"×"));
   b.appendChild(mk("title",{},label));
   const activate=e=>{e.preventDefault();e.stopPropagation();onDelete();};
@@ -1001,7 +1006,12 @@ function render(){
   const selectedPart=sel&&findP(sel);
   if(selectedPart){
     const d=DEF[selectedPart.type];
-    selectionL.appendChild(canvasDeleteButton(selectedPart.x+d.w-8,selectedPart.y+8,"ลบ "+d.nm,()=>{snap();delPart(selectedPart.id);}));
+    /* The button's 10 px radius is tangent to the outer top-right corner:
+       it is visually outside the frame, while remaining in the selection
+       layer above parts, wires, and instruments. */
+    const deleteButton=canvasDeleteButton(selectedPart.x+d.w+10,selectedPart.y-10,"ลบ "+d.nm,()=>{snap();delPart(selectedPart.id);});
+    deleteButton.classList.add("component-delete");
+    selectionL.appendChild(deleteButton);
   }
   if(selWire&&S().wires.includes(selWire)){
     const a=pinPos(selWire.a),b=pinPos(selWire.b);
