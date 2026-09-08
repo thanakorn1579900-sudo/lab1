@@ -45,9 +45,17 @@ body{font-family:Tahoma,"Segoe UI",sans-serif;background:#eef1f5;color:#2c3e50;
 .kk{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:11.5px;color:#4a5560}
 .kk b{background:#eef1f5;border:1px solid #d5dbe3;border-radius:4px;padding:2px 7px;
       font-family:Consolas,monospace;font-weight:400;min-width:34px;text-align:center;font-size:11px}
-#stageWrap{flex:1;position:relative;min-width:0;overflow:hidden}
-#stage{width:100%;height:100%;display:block;touch-action:none;user-select:none}
+#stageWrap{flex:1;position:relative;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;
+           scrollbar-gutter:stable both-edges;background:#c9cf52}
+/* A real work surface, larger than its viewport.  The SVG dimensions are
+   synchronized with zoom in JavaScript, so both scrollbars always cover all
+   drawable space rather than scrolling the surrounding page. */
+#stage{width:3000px;height:2200px;max-width:none;display:block;touch-action:none;user-select:none}
 #stage text{user-select:none}
+#stageWrap::-webkit-scrollbar{width:14px;height:14px}
+#stageWrap::-webkit-scrollbar-track{background:#e1e7dc;border-radius:8px}
+#stageWrap::-webkit-scrollbar-thumb{background:#8a9a71;border:3px solid #e1e7dc;border-radius:9px}
+#stageWrap::-webkit-scrollbar-thumb:hover{background:#61754b}
 #hud{position:absolute;left:12px;bottom:12px;background:rgba(20,26,33,.9);color:#fff;
      padding:9px 14px;border-radius:8px;font-size:12px;font-weight:700;max-width:70%}
 #hud.ok{background:rgba(13,62,36,.93);color:#7ee787}
@@ -89,13 +97,20 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 .wire-flow.reverse{animation-direction:reverse}
 .wire-terminal{stroke:#111820;stroke-width:1.2;pointer-events:none}
 .device-card,#selectionL{overflow:visible}
-/* SVG components use transforms rather than CSS box positioning.  The delete
-   control is rendered in #selectionL (the final, top-most SVG layer), so it
-   can sit beyond the component frame without being clipped or covered. */
 .canvas-delete{cursor:pointer;pointer-events:all;position:absolute;z-index:100}
 .component-delete{overflow:visible}
 .canvas-delete-bg{fill:#b42318;stroke:#fff;stroke-width:1.8}
 .canvas-delete:hover .canvas-delete-bg,.canvas-delete:focus .canvas-delete-bg{fill:#e3342f;stroke:#fff6c7;stroke-width:2.2}
+.battery-recharge{cursor:pointer;pointer-events:all}
+.battery-recharge-bg{fill:#087a3f;stroke:#d8ffe8;stroke-width:1.4}
+.battery-recharge:hover .battery-recharge-bg,.battery-recharge:focus .battery-recharge-bg{fill:#0aa354;stroke:#fff6a8;stroke-width:2}
+/* 1N4007 stays cardless; its title and A/K labels float beside the real part. */
+.realistic-diode{overflow:visible;cursor:move}
+.realistic-diode .diode-pin{cursor:crosshair}
+.component-title{pointer-events:none;paint-order:stroke;stroke:#f7fafc;stroke-width:4px;stroke-linejoin:round}
+.component-pin-label{pointer-events:none;paint-order:stroke;stroke:#f7fafc;stroke-width:3px;stroke-linejoin:round}
+.component-settings{cursor:pointer}
+.component-settings:hover .component-settings-bg{fill:#1f6feb;stroke:#fff}
 @keyframes currentFlow{to{stroke-dashoffset:-15}}
 /* ═══ มัลติมิเตอร์ดิจิตอล ═══ */
 #dmmWrap{background:#c9cf52;border-radius:10px;padding:6px;
@@ -150,9 +165,6 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   #slidebar .thumb b{right:3px;font-size:9px}
   #slidebar .thumb-close{width:16px;height:16px;font-size:13px;line-height:14px}
   #slidebar .tb{padding:5px 8px;font-size:11px;flex:none}
-
-  /* Keep secondary commands available by horizontal swipe, but lift Run/Stop
-     out of this row so it is always available over the board. */
   #toolbar{height:44px;flex:0 0 44px;gap:5px;padding:0 8px;overflow-x:auto;overflow-y:hidden;
            flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
   #toolbar .tb,#toolbar .sep,#toolbar label,#toolbar select{flex:none}
@@ -160,8 +172,6 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   #toolbar .sep{margin:0 1px}
   #toolbar #btnRun{position:fixed;right:12px;bottom:76px;z-index:1002;display:flex;align-items:center;
                    min-height:44px;padding:0 13px;border-radius:22px;box-shadow:0 5px 16px rgba(23,35,52,.25)}
-
-  /* Device palette: one touch-scrollable line, never a wrapped grid. */
   #palette{height:80px;flex:0 0 80px;width:100%;padding:5px 8px;gap:6px;overflow-x:auto;overflow-y:hidden;
            flex-wrap:nowrap;white-space:nowrap;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
            scroll-snap-type:x proximity}
@@ -169,16 +179,12 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   #palette .pi .ic{height:34px}
   #palette .pi .ic svg{width:40px;height:34px}
   #palette .pi .nm{font-size:9px;line-height:1.1}
-
-  /* The board receives at least 65% of the viewport height and cannot be
-     narrowed by either panel.  dvh provides the right size around mobile UI. */
   #body{display:block;position:relative;flex:1 0 65vh;min-height:65vh;min-height:65dvh;width:100%;overflow:hidden}
-  #stageWrap{width:100%;height:100%;min-height:65vh;min-height:65dvh;overflow:hidden;background:#c9cf52}
-  #stage{width:100%;height:100%}
+  #stageWrap{width:100%;height:100%;min-height:65vh;min-height:65dvh;overflow:auto;background:#c9cf52;
+             -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  #stage{width:3000px;height:2200px;max-width:none}
   #stageBg{fill:#c9cf52}
   #hud{left:10px;right:10px;bottom:128px;max-width:calc(100% - 20px);padding:8px 10px;font-size:11px}
-
-  /* Side panels slide over the canvas instead of taking layout space. */
   #side,#dock{position:fixed;top:0;bottom:0;height:100vh;height:100dvh;z-index:1201;visibility:hidden;
               pointer-events:none;transition:transform .24s ease,visibility 0s linear .24s;
               box-shadow:0 12px 32px rgba(15,23,42,.30)}
@@ -194,9 +200,6 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   #mobilePanelBackdrop{display:block;position:fixed;inset:0;z-index:1200;border:0;background:rgba(15,23,42,.42);
                         opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility 0s linear .2s}
   #mobilePanelBackdrop.is-visible{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .2s,visibility 0s}
-
-  /* Shortcuts to the overlays stay within thumb reach without covering the
-     device palette.  Zoom and Run/Stop remain floating over the canvas. */
   #mobilePanelActions{display:flex;position:fixed;top:184px;left:10px;z-index:1002;gap:7px}
   #mobilePanelActions button{min-height:40px;border:0;border-radius:20px;padding:0 11px;background:rgba(255,255,255,.95);
                              color:#273444;font-family:inherit;font-size:11px;font-weight:700;box-shadow:0 4px 12px rgba(23,35,52,.22)}
@@ -219,6 +222,7 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 
 <!-- ═══ Zoom Controls (fixed มุมขวาบน) ═══ -->
 <div id="zoomPanel" role="toolbar" aria-label="ควบคุมการซูม">
+  <button type="button" class="zb" id="btnAudio" title="เปิดเสียง" aria-label="เปิดเสียง" aria-pressed="false">🔇</button>
   <button type="button" class="zb" id="btnZoomOut" title="ซูมออก (−)" aria-label="ซูมออก">−</button>
   <button type="button" id="zoomPct" title="รีเซ็ตซูม 100% และจัดกึ่งกลาง" aria-label="รีเซ็ตซูม 100%">
     <span class="zm-ico" aria-hidden="true">🔍</span>
@@ -372,6 +376,24 @@ function batteryTerminalVoltage(p){
 const batteryLevelColor=soc=>soc<20?"#e05252":soc<50?"#e5a52a":"#2fbf5f";
 const fmtAh=value=>Number.isFinite(value)?`${value.toFixed(value<10?3:2)} Ah`:"—";
 const batteryRemainingDisplay=p=>{const v=batteryCapacityUnit(p)==="mAh"?batteryRemainingAh(p)*1000:batteryRemainingAh(p);return `${v.toFixed(v<10?3:2)} ${batteryCapacityUnit(p)}`;};
+/* Instantaneous AC source used by the same nodal network as DC sources. */
+const acFrequency=p=>Math.max(1,Math.min(400,Number(p.acFrequency)||50));
+const acInstantVoltage=p=>Math.max(0,Number(p.val)||0)*Math.SQRT2*Math.sin(2*Math.PI*acFrequency(p)*performance.now()/1000);
+/* Restores the configured physical capacity and voltage; this does not repair
+   a damaged battery or unrelated fault, it only clears the empty-battery cut-off. */
+function rechargeBattery(p){
+ if(!p||p.type!=="BATT"||!batteryIsEmpty(p))return false;
+ snap();
+ p.remainingAh=batteryCapacityAh(p);
+ p.batteryEmpty=false;p.batteryEmptyAlerted=false;p.outputCurrent=0;
+ p.actualVoltage=batteryNominalVoltage(p);p.actualCurrent=0;p.actualPower=0;
+ p.openVoltage=batteryOpenVoltage(p);p.currentLimited=false;p.overloadAlerted=false;
+ if(S().batteryAlert?.partId===p.id)S().batteryAlert=null;
+ lastBatteryTick=0;running=true;
+ showToast(`🔋 ชาร์จแบตเตอรี่ ${p.id} เต็ม 100% แล้ว — เริ่มคำนวณวงจรใหม่`);
+ render();
+ return true;
+}
 
 /* ═══ ตัวต้านทาน: รหัสสี 4/5 แถบ ↔ ค่าโอห์ม (ชุดข้อมูลเดียวกันทั้งภาพและวงจร) ═══ */
 const RES_BAND={
@@ -430,7 +452,7 @@ function resistorBandLabel(p){
 function resistorColorOptions(colors,selected){return colors.map(c=>`<option value="${c}" ${c===selected?"selected":""}>${c==="none"?"ไม่มีสี (±20%)":RES_BAND[c].label}</option>`).join("");}
 function resistorBandStyle(color){const hex=color==="none"?"#f5f7fa":RES_BAND[color].hex;return `background:${hex};color:${["black","brown","blue","violet"].includes(color)?"#fff":"#1f2933"}`;}
 const DEF={
- ECU:{nm:"ECU กล่องควบคุม",ic:"🖥",w:186,fill:"#38414d",head:"#222a33",
+ ECU:{nm:"ECU กล่องควบคุม",ic:"🖥",w:294,fill:"#38414d",head:"#222a33",
   pins:[["VREF","VREF 5V","#e06c75"],["SIG-A","SIG-A (ECT)","#61afef"],
         ["SIG-B","SIG-B (TPS)","#61afef"],["SIG-C","SIG-C (CKP)","#61afef"],
         ["SIG-D","SIG-D (IAT)","#61afef"],["SIG-E","SIG-E (MAP)","#61afef"],
@@ -547,7 +569,7 @@ function internalPass(p,pa,pb){
  if(p.type==="SW"||p.type==="PB"||p.type==="MCB"||p.type==="FUSE2")return !!p.on;
  if(p.type==="RELAY"){
   if((pa==="COM"&&pb==="NO")||(pa==="NO"&&pb==="COM"))return !!p.energized;
-  if((pa==="COM"&&pb==="NC")||(pa==="NC"&&pb==="COM"))return !p.energized;
+  if((pa==="COM"&&pb==="NC")||(pa==="NC"&&pb==="COM"))return relayType(p)==="SPDT"&&!p.energized;
   return true;}
  if(p.type==="CAP"||p.type==="CAP2")return false;
  if(p.type==="XFMR"||p.type==="OPTO")return pa[0]===pb[0];
@@ -557,7 +579,8 @@ function buildGraph(){
  const addEdge=(a,b,pass)=>{if(!a||!b)return;(adj[a]=adj[a]||[]).push({to:b,pass});
   (adj[b]=adj[b]||[]).push({to:a,pass});};
  S().wires.forEach(w=>addEdge(w.a,w.b,true));
- S().parts.forEach(p=>{const pairs=INTERNAL_EDGES[p.type];if(!pairs)return;
+ S().parts.forEach(p=>{let pairs=INTERNAL_EDGES[p.type];if(!pairs)return;
+  if(p.type==="RELAY"&&relayType(p)==="SPST")pairs=pairs.filter(([,pb])=>pb!=="NC");
   pairs.forEach(([pa,pb])=>addEdge(p.id+"."+pa,p.id+"."+pb,internalPass(p,pa,pb)));});
  return adj;}
 function floodOnce(){
@@ -566,7 +589,7 @@ function floodOnce(){
  S().parts.forEach(p=>{
   if(p.type==="BATT"&&!batteryIsEmpty(p)&&!p.damaged){highSeeds.push(p.id+".+");lowSeeds.push(p.id+".-");srcV=batteryTerminalVoltage(p);}
   if(p.type==="PSU"){highSeeds.push(p.id+".+");lowSeeds.push(p.id+".-");srcV=p.val;}
-  if(p.type==="AC"){highSeeds.push(p.id+".A");lowSeeds.push(p.id+".B");srcV=p.val;}
+  if(p.type==="AC"){const ac=acInstantVoltage(p);highSeeds.push(p.id+(ac>=0?".A":".B"));lowSeeds.push(p.id+(ac>=0?".B":".A"));srcV=Math.abs(ac);}
   if(p.type==="GND")lowSeeds.push(p.id+".G");});
  lowSeeds.push("CHASSIS");
  const flood=(seeds,set)=>{const q=[...seeds];seeds.forEach(s=>set.add(s));
@@ -630,11 +653,78 @@ let running=true;    // ⏻ สถานะเปิด/ปิดการจำ
 const S=()=>slides[cur], $=id=>document.getElementById(id);
 const stage=$("stage"),wireL=$("wireL"),partL=$("partL"),instrL=$("instrL"),selectionL=$("selectionL"),tmpW=$("tmpW");
 const viewport=$("viewport");
+
+/* ═══ Audio feedback (muted until the user explicitly enables it) ═══ */
+let audioEnabled=false,audioContext=null,audioMaster=null,audioAssets=null;
+const buzzerVoices=new Map();
+function makeAudioBuffer(ctx,duration,writer){
+ const frames=Math.max(1,Math.floor(ctx.sampleRate*duration)),buffer=ctx.createBuffer(1,frames,ctx.sampleRate),data=buffer.getChannelData(0);
+ for(let i=0;i<frames;i++)data[i]=writer(i/ctx.sampleRate,i/frames);
+ return buffer;
+}
+function preloadAudioAssets(ctx){
+ if(audioAssets)return audioAssets;
+ /* In-memory, synthesized assets remove playback latency without loading MP3 files. */
+ audioAssets={
+  click:makeAudioBuffer(ctx,.07,(t,n)=>(Math.random()*2-1)*Math.exp(-t*55)*.32+Math.sin(t*2*Math.PI*1700)*Math.exp(-t*48)*.18),
+  fault:makeAudioBuffer(ctx,.20,(t,n)=>((Math.random()*2-1)*.50+Math.sin(t*2*Math.PI*(260-150*n))*.45)*Math.exp(-t*18)),
+  alert:makeAudioBuffer(ctx,.26,(t,n)=>(Math.sin(t*2*Math.PI*(t<.12?880:1320))*.28)*Math.exp(-t*7))
+ };
+ return audioAssets;
+}
+function ensureAudioEngine(){
+ if(audioContext)return audioContext;
+ const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return null;
+ audioContext=new Context();audioMaster=audioContext.createGain();audioMaster.gain.value=.42;audioMaster.connect(audioContext.destination);
+ preloadAudioAssets(audioContext);return audioContext;
+}
+function playUiSound(name,level=1){
+ if(!audioEnabled)return;
+ const ctx=ensureAudioEngine();if(!ctx||ctx.state!=="running")return;
+ const buffer=audioAssets?.[name];if(!buffer)return;
+ const source=ctx.createBufferSource(),gain=ctx.createGain();gain.gain.value=Math.max(0,Math.min(1,level));
+ source.buffer=buffer;source.connect(gain).connect(audioMaster);source.start();
+}
+function stopBuzzerVoice(id){
+ const voice=buzzerVoices.get(id);if(!voice||!audioContext)return;
+ const now=audioContext.currentTime;voice.gain.gain.cancelScheduledValues(now);voice.gain.gain.setTargetAtTime(0,now,.018);
+ try{voice.osc.stop(now+.08);}catch(err){}buzzerVoices.delete(id);
+}
+function stopAllBuzzerVoices(){[...buzzerVoices.keys()].forEach(stopBuzzerVoice);}
+function syncBuzzerAudio(V){
+ if(!audioEnabled||!audioContext||audioContext.state!=="running"){stopAllBuzzerVoices();return;}
+ const active=new Set(),now=audioContext.currentTime;
+ S().parts.filter(p=>p.type==="BUZZ"&&!p.damaged).forEach(p=>{
+  const voltage=Math.abs((V[p.id+".+"]??0)-(V[p.id+".-"]??0)),ratio=Math.max(0,Math.min(1,voltage/12));
+  p.actualVoltage=voltage;p.actualCurrent=voltage/400;p.actualPower=voltage*p.actualCurrent;
+  if(voltage<.5){stopBuzzerVoice(p.id);return;}
+  active.add(p.id);let voice=buzzerVoices.get(p.id);
+  if(!voice){const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type="square";gain.gain.value=0;osc.connect(gain).connect(audioMaster);osc.start();voice={osc,gain};buzzerVoices.set(p.id,voice);}
+  voice.osc.frequency.setTargetAtTime(780+ratio*720,now,.035);
+  voice.gain.gain.setTargetAtTime(.012+.075*ratio,now,.03);
+ });
+ [...buzzerVoices.keys()].filter(id=>!active.has(id)).forEach(stopBuzzerVoice);
+}
+function updateAudioButton(){const button=$("btnAudio");if(!button)return;button.textContent=audioEnabled?"🔊":"🔇";button.title=audioEnabled?"ปิดเสียง":"เปิดเสียง";button.setAttribute("aria-label",button.title);button.setAttribute("aria-pressed",String(audioEnabled));}
+async function setAudioEnabled(enabled){
+ audioEnabled=enabled;
+ const ctx=enabled?ensureAudioEngine():audioContext;
+ if(enabled&&ctx){try{await ctx.resume();playUiSound("alert",.45);}catch(err){audioEnabled=false;}}
+ if(enabled&&!ctx)audioEnabled=false;
+ if(!audioEnabled)stopAllBuzzerVoices();
+ updateAudioButton();
+}
+/* Browser autoplay policy: prepare buffers after the first gesture, while
+   staying muted until the speaker button is deliberately switched on. */
+document.addEventListener("pointerdown",()=>{ensureAudioEngine();},{once:true,capture:true});
 /* ═══ Zoom & Pan state ═══ */
 const ZOOM_STEPS=[0.25,0.5,0.75,1,1.25,1.5,2];
+const WORKSPACE_WIDTH=3000,WORKSPACE_HEIGHT=2200;
 let zoomScale=1, panX=0, panY=0, zoomIdx=3; /* index 3 = 100% */
 function applyViewportTransform(){
   if(viewport)viewport.setAttribute("transform",`translate(${panX},${panY}) scale(${zoomScale})`);
+  /* Keep the scrollable SVG root large enough for the scaled drawing. */
+  if(stage){stage.style.width=`${WORKSPACE_WIDTH*zoomScale}px`;stage.style.height=`${WORKSPACE_HEIGHT*zoomScale}px`;}
   const pct=$("zoomPctVal"); if(pct)pct.textContent=Math.round(zoomScale*100)+"%";
   const out=$("btnZoomOut"), inn=$("btnZoomIn");
   if(out)out.disabled=zoomIdx<=0;
@@ -649,13 +739,15 @@ function setZoomIndex(idx, pivotClientX, pivotClientY){
   const cx=(pivotClientX!=null?pivotClientX:rect.left+rect.width/2);
   const cy=(pivotClientY!=null?pivotClientY:rect.top+rect.height/2);
   const prev=zoomScale;
-  const originX=rect.left, originY=rect.top;
-  const worldX=(cx-originX-panX)/prev;
-  const worldY=(cy-originY-panY)/prev;
+  const originX=rect.left, originY=rect.top,scrollLeft=wrap?.scrollLeft||0,scrollTop=wrap?.scrollTop||0;
+  const worldX=(cx-originX+scrollLeft-panX)/prev;
+  const worldY=(cy-originY+scrollTop-panY)/prev;
   zoomScale=next; zoomIdx=idx;
-  panX=cx-originX-worldX*next;
-  panY=cy-originY-worldY*next;
+  /* CSS scrolling is the one source of panning.  Resetting SVG translation
+     prevents a negative transform from hiding the left/top of the workspace. */
+  panX=0;panY=0;
   applyViewportTransform();
+  if(wrap){wrap.scrollLeft=Math.max(0,worldX*next-(cx-originX));wrap.scrollTop=Math.max(0,worldY*next-(cy-originY));}
 }
 function zoomByStep(dir, pivotClientX, pivotClientY){
   setZoomIndex(zoomIdx+dir, pivotClientX, pivotClientY);
@@ -687,6 +779,38 @@ function redo(){if(!future.length)return;hist.push(JSON.stringify(slides));
 const PIN_Y0=120,PIN_DY=26,ICON_BOX=84;
 const partH=t=>PIN_Y0+DEF[t].pins.length*PIN_DY+14;
 const findP=id=>S().parts.find(p=>p.id===id);
+/* 64 SVG units = four 16-unit perfboard grid intervals. */
+const DIODE_LEAD_END=64;
+const diodeRotation=p=>((Number(p.rot)||0)%360+360)%360;
+function diodePoint(p,x,y=0){const rad=diodeRotation(p)*Math.PI/180,cos=Math.cos(rad),sin=Math.sin(rad);return{x:p.x+x*cos-y*sin,y:p.y+x*sin+y*cos};}
+/* Relay starts as a five-terminal SPDT unit to preserve existing projects.
+   The terminal source of truth is shared by drawing, hit testing and netlist
+   creation, so changing type cannot leave an invisible/wireable NC pin. */
+function relayType(p){return p?.relayType==="SPST"?"SPST":"SPDT";}
+function pinsFor(p){
+ const pins=DEF[p.type]?.pins||[];
+ return p.type==="RELAY"&&relayType(p)==="SPST"?pins.filter(pin=>pin[0]!=="NC"):pins;
+}
+function componentName(p){
+ if(p.type==="RELAY")return relayType(p)==="SPST"?"รีเลย์ 4 ขา (SPST)":"รีเลย์ 5 ขา (SPDT)";
+ return DEF[p.type]?.nm||p.type;
+}
+function hasConfigurableSettings(p){
+ return !!(CTRL[p.type]||["BATT","BULB","RELAY","RES","LEDp","DIODE"].includes(p.type));
+}
+/* Every non-axial component uses terminals directly beneath its SVG asset.
+   These shared coordinates are used both by the renderer and the netlist. */
+function realisticTerminal(p,index){
+ const d=DEF[p.type];
+ /* ECU has eight terminals in one centred row.  The wider ECU footprint and
+    31-unit pitch keep SIG-A/SIG-B labels separate while the same coordinates
+    remain the source of truth for wires, hit tests and the circuit netlist. */
+ if(p.type==="ECU"){
+  return{x:d.w/2+(index-3.5)*31,y:112};
+ }
+ const count=pinsFor(p).length,spacing=count===1?0:Math.min(32,120/(count-1));
+ return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};
+}
 function otherEnd(pid){const w=S().wires.find(w=>w.a===pid||w.b===pid);
  if(!w)return null;return w.a===pid?w.b:w.a;}
 function pinPos(pid){
@@ -694,8 +818,23 @@ function pinPos(pid){
  if(pid==="DMM.BLACK")return dmmJackPos("COM");
  if(pid.startsWith("SCOPE.")){const[,ch,rb]=pid.split(".");return scopeJackPos(ch,rb);}
  const[i,pn]=pid.split(".");const p=findP(i);if(!p)return null;
- const d=DEF[p.type],k=d.pins.findIndex(x=>x[0]===pn);if(k<0)return null;
- const y=p.y+PIN_Y0+k*PIN_DY;return p.type==="ECU"?{x:p.x+d.w,y}:{x:p.x,y};}
+ if(p.type==="DIODE")return diodePoint(p,pn==="K"?DIODE_LEAD_END:-DIODE_LEAD_END);
+ const k=pinsFor(p).findIndex(x=>x[0]===pn);if(k<0)return null;
+ const terminal=realisticTerminal(p,k);return{x:p.x+terminal.x,y:p.y+terminal.y};}
+/* SVG's elementFromPoint() can return a wire or a transparent SVG child
+   instead of the terminal below it.  Resolve the nearest model pin from its
+   real coordinates as a fallback, so wiring remains reliable while zoomed,
+   rotated, or when terminals are visually covered by a wire end. */
+function nearestConnectablePin(point){
+ const ids=[];
+ S().parts.forEach(p=>{pinsFor(p).forEach(pin=>ids.push(p.id+"."+pin[0]));});
+ if(dmmVisible)ids.push("DMM.RED","DMM.BLACK");
+ if(scopeVisible)["CH1","CH2","CH3"].forEach(channel=>{ids.push(`SCOPE.${channel}.RED`,`SCOPE.${channel}.BLACK`);});
+ const radius=16/Math.max(.25,zoomScale);let best=null,bestDistance=radius*radius;
+ ids.forEach(id=>{const pos=pinPos(id);if(!pos)return;const dx=pos.x-point.x,dy=pos.y-point.y,distance=dx*dx+dy*dy;
+  if(distance<=bestDistance){best=id;bestDistance=distance;}});
+ return best;
+}
 
 /* ═══════════════════════════════════════════════════════════
    ขั้นที่ 4 : วาดแผงวงจร
@@ -778,18 +917,23 @@ function partIcon(p){
     G.appendChild(mk("text",{x:14,y:17.5,"text-anchor":"middle","font-size":6.2,fill:"#e6edf3","font-weight":700},"1N4007"));
     if(p.conducting)G.appendChild(mk("circle",{cx:9,cy:8,r:2,fill:"#7ee787"}));
   } else if(t==="LEDp"){
-    const spec=ledSpec(p),fill=broken?"#1c2229":lit?spec.color:spec.off;
+    const spec=ledSpec(p),brightness=broken?0:Math.max(0,Math.min(1,(Number(p.actualCurrent)||0)/.020)),fill=broken?"#1c2229":brightness>.001?spec.color:spec.off;
+    if(brightness>.001){G.appendChild(mk("circle",{cx:16,cy:16,r:15+brightness*11,fill:spec.color,opacity:.05+.17*brightness,"pointer-events":"none"}));
+      G.appendChild(mk("circle",{cx:16,cy:16,r:10+brightness*6,fill:spec.color,opacity:.10+.18*brightness,"pointer-events":"none"}));}
     G.appendChild(mk("path",{d:"M8 22 L8 10 L22 16 Z",fill,stroke:broken?"#0b0d10":"none","stroke-width":broken?1.1:0}));
     G.appendChild(mk("line",{x1:22,y1:8,x2:22,y2:24,stroke:fill,"stroke-width":2.5}));
-    if(lit){G.appendChild(mk("line",{x1:24,y1:6,x2:28,y2:2,stroke:"#ffd166","stroke-width":1.4}));
-      G.appendChild(mk("line",{x1:26,y1:9,x2:30,y2:7,stroke:"#ffd166","stroke-width":1.4}));}
+    if(brightness>.001){G.appendChild(mk("line",{x1:24,y1:6,x2:28,y2:2,stroke:"#ffd166","stroke-width":1.2+brightness*1.2,opacity:brightness}));
+      G.appendChild(mk("line",{x1:26,y1:9,x2:30,y2:7,stroke:"#ffd166","stroke-width":1.2+brightness*1.2,opacity:brightness}));}
     if(broken){G.appendChild(mk("line",{x1:5,y1:5,x2:27,y2:27,stroke:"#ff6b5b","stroke-width":2.4}));
       G.appendChild(mk("line",{x1:27,y1:5,x2:5,y2:27,stroke:"#ff6b5b","stroke-width":2.4}));}
   } else if(t==="BULB"){
-    G.appendChild(mk("circle",{cx:15,cy:12,r:9,fill:broken?"#252a30":lit?"#fff4c2":"#e9e6d8",
+    const ratio=broken?0:Math.max(0,Math.min(1,(Number(p.actualVoltage)||0)/Math.max(1,bulbRatedVoltage(p)))),powerRatio=broken?0:Math.max(0,Math.min(1,(Number(p.actualPower)||0)/Math.max(.1,bulbRatedPower(p))));
+    const glow=Math.max(ratio*.65,powerRatio),filament=glow<.12?"#8a8468":glow<.45?"#ee6c32":glow<.8?"#ffb21c":"#fff4c2";
+    if(glow>.02)G.appendChild(mk("circle",{cx:15,cy:12,r:10+glow*11,fill:filament,opacity:.06+.17*glow,"pointer-events":"none"}));
+    G.appendChild(mk("circle",{cx:15,cy:12,r:9,fill:broken?"#252a30":glow>.02?filament:"#e9e6d8",
       stroke:broken?"#111820":"#b9b190","stroke-width":1.5}));
     G.appendChild(mk("path",{d:"M11 12 L14 8 M14 8 L13 14 M13 14 L17 10 M17 10 L16 16",
-      fill:"none",stroke:broken?"#77808a":lit?"#e0a400":"#8a8468","stroke-width":1}));
+      fill:"none",stroke:broken?"#77808a":filament,"stroke-width":1+glow}));
     G.appendChild(mk("rect",{x:11,y:20,width:8,height:6,fill:"#b0b0b0"}));
     for(let i=0;i<3;i++)G.appendChild(mk("line",{x1:11,y1:21+i*1.6,x2:19,y2:21+i*1.6,
       stroke:"#7a7a7a","stroke-width":.8}));
@@ -923,6 +1067,44 @@ function canvasDeleteButton(x,y,label,onDelete){
   b.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")activate(e);});
   return b;
 }
+/* Appears on the battery itself only when it has reached 0%.  It is drawn on
+   selectionL, the canvas' top-most layer, so wires and other devices cannot
+   cover the control. */
+function batteryRechargeButton(p){
+  const d=DEF[p.type],width=d.w-28,height=22,x=p.x+14,y=p.y+126;
+  const b=mk("g",{class:"battery-recharge no-drag",transform:`translate(${x},${y})`,role:"button",tabindex:"0","aria-label":`ชาร์จแบตเตอรี่ ${p.id} เต็ม 100%`});
+  b.appendChild(mk("rect",{class:"battery-recharge-bg",x:0,y:0,width,height,rx:11}));
+  b.appendChild(mk("text",{x:width/2,y:15,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"#fff","pointer-events":"none"},"↻ ชาร์จใหม่"));
+  b.appendChild(mk("title",{},"ชาร์จแบตเตอรี่เต็ม 100% และเริ่มคำนวณวงจรใหม่"));
+  const activate=e=>{e.preventDefault();e.stopPropagation();rechargeBattery(p);};
+  b.addEventListener("pointerdown",e=>e.stopPropagation());
+  b.addEventListener("pointerup",activate);
+  b.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")activate(e);});
+  return b;
+}
+/* Axial 1N4007: unbanded black end = Anode (A), silver-banded end = Cathode
+   (K).  Its local origin is the centre of the body, so rotation keeps both
+   lead-end connection points exactly aligned with the drawing. */
+function realisticDiode(p){
+  const g=mk("g",{transform:`translate(${p.x},${p.y}) rotate(${diodeRotation(p)})`,class:"realistic-diode"});
+  const bodyFill=p.damaged?"#67272a":"#171a1f",bodyStroke=p.conducting&&!p.damaged?"#54d989":"#4e5964";
+  g.appendChild(mk("text",{class:"component-title",x:0,y:-22,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"#263545"},"ไดโอด 1N4007"));
+  g.appendChild(mk("line",{x1:-DIODE_LEAD_END,y1:0,x2:-27,y2:0,stroke:"#b8c0c7","stroke-width":2.6,"stroke-linecap":"round"}));
+  g.appendChild(mk("line",{x1:27,y1:0,x2:DIODE_LEAD_END,y2:0,stroke:"#b8c0c7","stroke-width":2.6,"stroke-linecap":"round"}));
+  g.appendChild(mk("circle",{cx:-DIODE_LEAD_END,cy:0,r:3.4,fill:"#d4d9de",stroke:"#78838d","stroke-width":1}));
+  g.appendChild(mk("circle",{cx:DIODE_LEAD_END,cy:0,r:3.4,fill:"#d4d9de",stroke:"#78838d","stroke-width":1}));
+  g.appendChild(mk("rect",{class:"diode-body",x:-27,y:-9,width:54,height:18,rx:8.5,fill:bodyFill,stroke:bodyStroke,"stroke-width":1.5}));
+  g.appendChild(mk("path",{d:"M -20 -5.5 L 9 -5.5",stroke:"rgba(255,255,255,.20)","stroke-width":1.4,"stroke-linecap":"round"}));
+  g.appendChild(mk("rect",{x:13,y:-8.6,width:5.5,height:17.2,rx:1,fill:"#d8dce1",stroke:"#9299a1","stroke-width":.7}));
+  [["A",-DIODE_LEAD_END,"Anode (A) — ปลายตัวถังสีดำ"],["K",DIODE_LEAD_END,"Cathode (K) — ปลายแถบสีเงิน"]].forEach(([pin,x,label])=>{
+    const hit=mk("circle",{cx:x,cy:0,r:9,fill:"transparent",stroke:"transparent",class:"pin diode-pin"});
+    hit.dataset.pid=p.id+"."+pin;hit.appendChild(mk("title",{},`${p.id}.${pin} — ${label}`));g.appendChild(hit);
+    g.appendChild(mk("text",{class:"component-pin-label",x,y:18,"text-anchor":"middle","font-size":9,"font-weight":700,fill:"#344454"},pin));
+  });
+  g.appendChild(mk("title",{},`1N4007 • A = ปลายดำ • K = แถบเงิน • หมุน ${diodeRotation(p)}°`));
+  g.dataset.pid=p.id;
+  return g;
+}
 function render(){
   const circuit=solveAll();
   wireL.innerHTML="";partL.innerHTML="";selectionL.innerHTML="";
@@ -947,28 +1129,31 @@ function render(){
     }
   });
   S().parts.forEach(p=>{
-    const d=DEF[p.type],h=partH(p.type),R=p.type==="ECU",
-      g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"device-card"});
-    /* ═══ Realistic View: แผ่นฐานสีอ่อนแทนกล่องบล็อกทึบเดิม — ตัวอุปกรณ์เสมือนจริง
-       (SVG ภาพอุปกรณ์จริง จาก partIcon) เป็นจุดเด่นแทน ═══ */
-    g.appendChild(mk("rect",{x:0,y:0,width:d.w,height:h,rx:14,fill:"#fbfcfe",
-      stroke:sel===p.id?"#ff8c42":"#c7cfd8","stroke-width":sel===p.id?3:1.4}));
-    g.appendChild(mk("rect",{x:5,y:5,width:d.w-10,height:h-10,rx:10,class:"device-panel"}));
+    if(p.type==="DIODE"){partL.appendChild(realisticDiode(p));return;}
+    const d=DEF[p.type],g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-component"});
     const art=partIcon(p),sc=ICON_BOX/30;
     art.setAttribute("transform",`translate(${(d.w-ICON_BOX)/2},10) scale(${sc})`);
     g.appendChild(art);
-    g.appendChild(mk("text",{x:d.w/2,y:10+ICON_BOX+16,"text-anchor":"middle","font-size":10.5,
-      "font-weight":700,fill:"#2c3e50"},d.nm));
-    d.pins.forEach((pn,i)=>{const y=PIN_Y0+i*PIN_DY;
-      /* ขาสายตะกั่ว (lead) ยื่นจากตัวอุปกรณ์ไปยังจุดต่อสายไฟ ให้ดูเหมือนขาจริง */
-      g.appendChild(mk("line",{x1:R?d.w-16:16,y1:y,x2:R?d.w:0,y2:y,stroke:pn[2],"stroke-width":2.6}));
-      g.appendChild(mk("text",{x:R?d.w-22:22,y:y+4,"font-size":10,fill:"#5c6874",
-        "text-anchor":R?"end":"start"},pn[1]));
-      const c=mk("circle",{cx:R?d.w:0,cy:y,r:8,fill:pn[2],stroke:"#12161b","stroke-width":2,class:"pin"});
+    g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"#263545"},componentName(p)));
+    if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:58,rx:ICON_BOX/2+8,ry:ICON_BOX/2+8,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+    const pins=pinsFor(p);
+    pins.forEach((pn,i)=>{const terminal=realisticTerminal(p,i);
+      /* Metal lead from the rendered asset to its physical terminal. */
+      g.appendChild(mk("line",{x1:terminal.x,y1:92,x2:terminal.x,y2:terminal.y-6,stroke:"#b6bec6","stroke-width":2.6,"stroke-linecap":"round"}));
+      const c=mk("circle",{cx:terminal.x,cy:terminal.y,r:8,fill:pn[2],stroke:"#12161b","stroke-width":2,class:"pin"});
       c.dataset.pid=p.id+"."+pn[0];
-      c.appendChild(mk("title",{},`${p.id}.${pn[0]} — ${pn[1]}`));g.appendChild(c);});
+      c.appendChild(mk("title",{},`${p.id}.${pn[0]} — ${pn[1]}`));g.appendChild(c);
+      g.appendChild(mk("text",{class:"component-pin-label",x:terminal.x,y:terminal.y+20,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#344454"},pn[0]));});
+    if(hasConfigurableSettings(p)){
+      const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"}),gx=d.w/2+38,gy=11;
+      gear.appendChild(mk("circle",{class:"component-settings-bg",cx:gx,cy:gy,r:11,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));
+      gear.appendChild(mk("text",{x:gx,y:gy+4,"text-anchor":"middle","font-size":13,fill:"#334155"},"⚙"));
+      gear.appendChild(mk("title",{},"ตั้งค่าอุปกรณ์"));
+      gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;document.querySelector('.tab[data-p="dmm"]')?.click();render();};
+      g.appendChild(gear);
+    }
     if(TOGGLE_TYPES.has(p.type)){
-      const on=!!p.on,cx=d.w-16,cy=16;
+      const on=!!p.on,cx=d.w/2+34,cy=24;
       const tg=mk("g",{class:"no-drag toggleBtn",style:"cursor:pointer"});
       tg.appendChild(mk("circle",{cx,cy,r:11,fill:"rgba(0,0,0,0)"})); /* พื้นที่คลิกกว้างขึ้น กันกดพลาด */
       tg.appendChild(mk("circle",{cx,cy,r:9,fill:on?"#2fbf5f":"#c0392b",stroke:"#12161b","stroke-width":1.5}));
@@ -977,26 +1162,26 @@ function render(){
       tg.appendChild(mk("title",{},on?lbl[0]:lbl[1]));
       /* PB เป็นปุ่ม NO แบบ momentary: กดค้าง=ON ปล่อย=OFF; อื่น ๆ เป็นสวิตช์ค้างสถานะ */
       if(p.type==="PB"){
-        tg.addEventListener("pointerdown",ev=>{ev.stopPropagation();if(!p.on){snap();p.on=true;render();}momentaryPb=p;});
-      }else tg.addEventListener("pointerup",ev=>{ev.stopPropagation();snap();p.on=!p.on;render();});
+        tg.addEventListener("pointerdown",ev=>{ev.stopPropagation();if(!p.on){snap();p.on=true;playUiSound("click");render();}momentaryPb=p;});
+      }else tg.addEventListener("pointerup",ev=>{ev.stopPropagation();snap();p.on=!p.on;playUiSound("click");render();});
       g.appendChild(tg);
     }
     if(p.type==="RELAY"){
-      g.appendChild(mk("circle",{cx:d.w-16,cy:16,r:7,fill:p.energized?"#ffd400":"#cfd6de",
+      g.appendChild(mk("circle",{cx:d.w/2+34,cy:24,r:7,fill:p.energized?"#ffd400":"#cfd6de",
         stroke:"#12161b","stroke-width":1.5}));
       g.appendChild(mk("title",{},p.energized?"คอยล์ทำงาน — หน้าสัมผัสต่อ":"คอยล์ไม่ทำงาน"));
     }
     if(["LEDp","BULB","BUZZ","BELL","FAN"].includes(p.type)){
       const lit=!!p.lit;
-      g.appendChild(mk("circle",{cx:d.w-16,cy:16,r:9,fill:lit?"#ffe680":"#e3e8ee",
+      g.appendChild(mk("circle",{cx:d.w/2+34,cy:24,r:9,fill:lit?"#ffe680":"#e3e8ee",
         opacity:lit?1:.7,stroke:lit?"#ffd400":"#c7cfd8","stroke-width":lit?2:1}));
       g.appendChild(mk("title",{},lit?"ทำงานอยู่ (มีไฟจ่ายครบวงจร)":"ไม่มีไฟ / วงจรยังไม่ครบ"));
     }
     if(p.damaged){
       const badge=mk("g",{class:"no-drag",style:"cursor:pointer"});
-      badge.appendChild(mk("circle",{cx:d.w-40,cy:16,r:11,fill:"#b42318",stroke:"#fff2a8","stroke-width":1.4,
+      badge.appendChild(mk("circle",{cx:d.w/2-34,cy:24,r:11,fill:"#b42318",stroke:"#fff2a8","stroke-width":1.4,
         style:"animation:hazardPulse 1s ease-in-out infinite"}));
-      badge.appendChild(mk("text",{x:d.w-40,y:20,"text-anchor":"middle","font-size":13,"font-weight":700,fill:"#fff"},"!"));
+      badge.appendChild(mk("text",{x:d.w/2-34,y:28,"text-anchor":"middle","font-size":13,"font-weight":700,fill:"#fff"},"!"));
       badge.appendChild(mk("title",{},"⚡ อุปกรณ์เสียหาย/ช็อต — คลิกที่นี่เพื่อซ่อม/เปลี่ยนทันที"));
       badge.onpointerup=e=>{e.stopPropagation();snap();repairParts(p);render();};
       g.appendChild(badge);
@@ -1006,13 +1191,12 @@ function render(){
   const selectedPart=sel&&findP(sel);
   if(selectedPart){
     const d=DEF[selectedPart.type];
-    /* The button's 10 px radius is tangent to the outer top-right corner:
-       it is visually outside the frame, while remaining in the selection
-       layer above parts, wires, and instruments. */
-    const deleteButton=canvasDeleteButton(selectedPart.x+d.w+10,selectedPart.y-10,"ลบ "+d.nm,()=>{snap();delPart(selectedPart.id);});
+    const deletePoint=selectedPart.type==="DIODE"?diodePoint(selectedPart,50,-18):{x:selectedPart.x+d.w/2+52,y:selectedPart.y+8};
+    const deleteButton=canvasDeleteButton(deletePoint.x,deletePoint.y,"ลบ "+d.nm,()=>{snap();delPart(selectedPart.id);});
     deleteButton.classList.add("component-delete");
     selectionL.appendChild(deleteButton);
   }
+  S().parts.filter(p=>p.type==="BATT"&&batteryIsEmpty(p)).forEach(p=>selectionL.appendChild(batteryRechargeButton(p)));
   if(selWire&&S().wires.includes(selWire)){
     const a=pinPos(selWire.a),b=pinPos(selWire.b);
     if(a&&b){const m=bezMid(a,b);
@@ -1035,11 +1219,15 @@ stage.addEventListener("pointerdown",e=>{const P=pt(e);
     if(arm==="LEDp")newPart.ledColor="red";
     if(arm==="BULB"){newPart.ratedV=12;newPart.ratedW=5;}
     if(arm==="BATT"){newPart.battVoltage=12;newPart.battCapacity=45;newPart.battCapacityUnit="Ah";newPart.battMaxCurrent=400;newPart.remainingAh=45;newPart.batteryEmpty=false;}
+    if(arm==="DIODE")newPart.rot=0;
+    if(arm==="RELAY")newPart.relayType="SPDT";
     if(arm==="RES"){newPart.val=220;newPart.resBandCount=4;newPart.resBands=["red","red","brown","gold"];newPart.resTolerance="gold";newPart.ratedW=.25;newPart.overloadSeconds=0;}
     S().parts.push(newPart);
     document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));arm=null;
     stage.style.cursor="default";render();return;}
-  if(e.target.classList.contains("pin")){wiring=e.target.dataset.pid;
+  const directPin=e.target.closest?e.target.closest(".pin"):null;
+  const startPin=directPin?.dataset.pid||nearestConnectablePin(P);
+  if(startPin){wiring=startPin;
     stage.setPointerCapture(e.pointerId);return;}
   /* ═ แก้บัค: ปุ่มเปิด/ปิด, ลูกบิดมิเตอร์, รูเสียบสาย, แท็บสโคป ต้องไม่ถูก
      ระบบ "ลาก/เลือกชิ้นส่วน" แย่ง event ไป — เพราะ render() ที่เรียกจากโค้ด
@@ -1059,8 +1247,9 @@ stage.addEventListener("pointermove",e=>{const P=pt(e);
     pos.x=Math.round((P.x-drag.dx)/8)*8;pos.y=Math.round((P.y-drag.dy)/8)*8;render();}
   else if(drag&&drag.p){drag.p.x=Math.round((P.x-drag.dx)/8)*8;drag.p.y=Math.round((P.y-drag.dy)/8)*8;render();}});
 stage.addEventListener("pointerup",e=>{tmpW.setAttribute("d","");
-  if(wiring){const el=document.elementFromPoint(e.clientX,e.clientY);
-    if(el&&el.classList.contains("pin")&&el.dataset.pid!==wiring){const b=el.dataset.pid;
+  if(wiring){const el=document.elementFromPoint(e.clientX,e.clientY),directPin=el?.closest?.(".pin");
+    const b=directPin?.dataset.pid||nearestConnectablePin(pt(e));
+    if(b&&b!==wiring){
       if(!S().wires.some(w=>k2(w.a,w.b)===k2(wiring,b))){snap();
         const isProbe=s=>s.startsWith("DMM.")||s.startsWith("SCOPE.");
         if(isProbe(wiring))S().wires=S().wires.filter(w=>w.a!==wiring&&w.b!==wiring);
@@ -1076,7 +1265,7 @@ stage.addEventListener("pointerup",e=>{tmpW.setAttribute("d","");
     wiring=null;render();}
   drag=null;});
 /* ปล่อยปุ่มกดได้แม้ pointerup เกิดนอกตัวปุ่ม/นอก SVG */
-document.addEventListener("pointerup",()=>{if(momentaryPb){const p=momentaryPb;momentaryPb=null;if(p.on){p.on=false;render();}}});
+document.addEventListener("pointerup",()=>{if(momentaryPb){const p=momentaryPb;momentaryPb=null;if(p.on){p.on=false;playUiSound("click");render();}}});
 stage.addEventListener("contextmenu",e=>{if(e.target.classList.contains("wire"))e.preventDefault();});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"){arm=null;sel=null;selWire=null;document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));render();}
@@ -1084,6 +1273,7 @@ document.addEventListener("keydown",e=>{
   if(e.ctrlKey&&e.key.toLowerCase()==="y"){e.preventDefault();redo();}
   if(!sel)return;const p=findP(sel);if(!p)return;
   if(e.key.toLowerCase()==="d"){snap();delPart(sel);}
+  if(e.key.toLowerCase()==="r"&&p.type==="DIODE"){e.preventDefault();snap();p.rot=(diodeRotation(p)+45)%360;render();return;}
   const M={ArrowUp:[0,-8],ArrowDown:[0,8],ArrowLeft:[-8,0],ArrowRight:[8,0]}[e.key];
   if(M){e.preventDefault();p.x+=M[0];p.y+=M[1];render();}});
 function delWire(w){
@@ -1117,9 +1307,11 @@ function componentBranches(p){
   if(p.type==="BUZZ")return [[P+"+",P+"-",400]];
   if(p.type==="BELL")return [[P+"A",P+"B",160]];
   if(p.type==="FAN")return [[P+"A",P+"B",80]];
-  if(p.type==="RELAY")return [[P+"COIL+",P+"COIL-",400],
-    [P+"COM",P+"NO",p.energized ? .02 : INF],
-    [P+"COM",P+"NC",p.energized ? INF : .02]];
+  if(p.type==="RELAY"){
+    const branches=[[P+"COIL+",P+"COIL-",400],[P+"COM",P+"NO",p.energized ? .02 : INF]];
+    if(relayType(p)==="SPDT")branches.push([P+"COM",P+"NC",p.energized ? INF : .02]);
+    return branches;
+  }
   if(p.type==="XFMR")return [[P+"P1",P+"P2",15],[P+"S1",P+"S2",6]];
   return [];
 }
@@ -1145,9 +1337,10 @@ function solveDcNetwork(branches){
   S().parts.forEach(p=>{const P=p.id+".";
     if(p.type==="BATT"&&!p.damaged){setFixed(P+"-",0);setFixed(P+"+",batteryTerminalVoltage(p));}
     if(p.type==="PSU"&&!p.damaged){setFixed(P+"-",0);setFixed(P+"+",Math.max(0,+p.val||0));}
-    /* AC: ประมาณเป็นค่าเฉลี่ยแบบ full-wave (peak = RMS×√2) เพื่อให้วงจรเรียงกระแส (บริดจ์ไดโอด)
-       จ่ายไฟให้ LED/หลอด/รีเลย์ในโหมด DC-approximation ได้เหมือนวงจรจริง */
-    if(p.type==="AC"&&!p.damaged){setFixed(P+"B",0);setFixed(P+"A",Math.max(0,+p.val||0)*Math.SQRT2);}
+    /* AC participates in the netlist with its signed instantaneous sine
+       voltage.  A bridge therefore forward-biases the opposite diode pair on
+       each half-cycle instead of permanently holding one pair at 0 mA. */
+    if(p.type==="AC"&&!p.damaged){setFixed(P+"B",0);setFixed(P+"A",acInstantVoltage(p));}
     if(p.type==="GND")setFixed(P+"G",0);
     if(p.type==="ECU"){setFixed(P+"GND-S",.03);setFixed(P+"VREF",VREF);setFixed(P+"B+",VBATT);}
   });
@@ -1178,6 +1371,8 @@ function batteryLiveData(p,branches,V){
  const voltage=Math.max(0,Number.isFinite(V[P])?V[P]:batteryTerminalVoltage(p));
  p.outputCurrent=batteryIsEmpty(p)?0:current;p.actualVoltage=voltage;p.actualCurrent=p.outputCurrent;
  p.actualPower=voltage*p.outputCurrent;p.openVoltage=batteryOpenVoltage(p);p.currentLimited=p.outputCurrent>batteryMaxCurrent(p);
+ if(p.currentLimited&&!p.overloadAlerted){p.overloadAlerted=true;playUiSound("fault");showToast(`⚠ แบตเตอรี่ ${p.id} กระแสเกินพิกัด ${batteryMaxCurrent(p).toFixed(1)} A`);}
+ if(!p.currentLimited)p.overloadAlerted=false;
  return {voltage,current:p.outputCurrent,power:p.actualPower,soc:batterySoc(p),remainingAh:batteryRemainingAh(p)};
 }
 function resistorLiveData(p,V){
@@ -1197,7 +1392,7 @@ function advanceSimulation(){
   p.remainingAh=Math.max(0,before-used);
   if(p.remainingAh<=.000001){
    p.remainingAh=0;p.batteryEmpty=true;p.outputCurrent=0;p.actualCurrent=0;p.actualPower=0;topologyChanged=true;
-   if(!p.batteryEmptyAlerted){p.batteryEmptyAlerted=true;S().batteryAlert={partId:p.id,message:`🔋 พลังงานแบตเตอรี่ ${p.id} หมด (0%) — วงจรหยุดทำงานแล้ว กรุณาชาร์จ/เปลี่ยนแบตเตอรี่`};showToast(S().batteryAlert.message);}
+   if(!p.batteryEmptyAlerted){p.batteryEmptyAlerted=true;S().batteryAlert={partId:p.id,message:`🔋 พลังงานแบตเตอรี่ ${p.id} หมด (0%) — วงจรหยุดทำงานแล้ว กด “↻ ชาร์จใหม่” บนแบตเตอรี่เพื่อเริ่มใหม่`};showToast(S().batteryAlert.message);}
   }
  });
  S().parts.filter(p=>p.type==="RES"&&!p.damaged).forEach(p=>{
@@ -1308,11 +1503,13 @@ function registerCircuitFault(message,part){
   const slide=S();slide.faultInfo={message,partId:part?.id||null};
   if(!Array.isArray(slide.faultLog))slide.faultLog=[];
   if(!slide.faultLog.some(x=>x.message===message))slide.faultLog.unshift({message,at:Date.now()});
+  playUiSound("fault");
   showToast(message);
 }
 function showToast(message){
  const toast=$("toast");if(!toast)return;
  toast.textContent=message;toast.classList.add("show");
+ playUiSound("alert",.65);
  if(toastTimer)clearTimeout(toastTimer);
  toastTimer=setTimeout(()=>toast.classList.remove("show"),7500);
 }
@@ -1350,7 +1547,7 @@ function solveAll(){
     const ecu0=S().parts.find(x=>x.type==="ECU");if(ecu0){add([ecu0.id+".VREF",ecu0.id+".SIG-A",RPULL]);add([ecu0.id+".VREF",ecu0.id+".SIG-D",RPULL]);}};
   const stabilize=()=>{
    rebuildBranches();V=solveDcNetwork(branches);
-   for(let pass=0;pass<4;pass++){let changed=false;S().parts.filter(p=>p.type==="RELAY").forEach(p=>{const P=p.id+".",on=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0))>=9;if(on!==!!p.energized){p.energized=on;changed=true;}});S().parts.filter(p=>p.type==="DIODE"&&!p.damaged).forEach(p=>{const P=p.id+".",on=(V[P+"A"]??0)-(V[P+"K"]??0)>=.62;if(on!==!!p.conducting){p.conducting=on;changed=true;}});if(!changed)break;rebuildBranches();V=solveDcNetwork(branches);}
+   for(let pass=0;pass<10;pass++){let changed=false;S().parts.filter(p=>p.type==="RELAY").forEach(p=>{const P=p.id+".",on=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0))>=9;if(on!==!!p.energized){p.energized=on;changed=true;}});S().parts.filter(p=>p.type==="DIODE"&&!p.damaged).forEach(p=>{const P=p.id+".",on=(V[P+"A"]??0)-(V[P+"K"]??0)>=.55;if(on!==!!p.conducting){p.conducting=on;changed=true;}});if(!changed)break;rebuildBranches();V=solveDcNetwork(branches);}
    applySensorSignals(V,R);
   };
   const syncBattery=()=>S().parts.filter(p=>p.type==="BATT").forEach(p=>batteryLiveData(p,branches,V));
@@ -1906,8 +2103,8 @@ syncMobilePanels();
 function pinLabel(pid){if(!pid)return"—";
  if(pid==="CHASSIS")return"ตัวถัง (CHASSIS)";if(pid==="BATT+")return"แบต +";
  const[i,pn]=pid.split(".");const p=findP(i);if(!p)return pid;
- const d=DEF[p.type],pn2=d.pins.find(x=>x[0]===pn);
- return `${d.nm} — ${pn2?pn2[1]:pn}`;}
+ const pn2=pinsFor(p).find(x=>x[0]===pn);
+ return `${componentName(p)} — ${pn2?pn2[1]:pn}`;}
 function updateStatus(){
  const h=$("hud"),ecu=S().parts.find(x=>x.type==="ECU"),sens=S().parts.filter(p=>REQ[p.type]);
  const dmgList=S().parts.filter(p=>p.damaged||p.blown||p.tripped);
@@ -1927,7 +2124,7 @@ function updateStatus(){
  $("btnRepair").classList.remove("act");
  const emptyBatteries=S().parts.filter(p=>p.type==="BATT"&&batteryIsEmpty(p));
  if(emptyBatteries.length){h.className="bad";
-  h.textContent=`🔋 พลังงานแบตเตอรี่หมด (0%) — วงจรหยุดทำงานแล้ว เลือกแบตเตอรี่แล้วกด “ชาร์จเต็ม 100%” หรือเปลี่ยนแบตเตอรี่`;
+  h.textContent=`🔋 พลังงานแบตเตอรี่หมด (0%) — วงจรหยุดทำงานแล้ว กดปุ่ม “↻ ชาร์จใหม่” ที่ลอยอยู่บนแบตเตอรี่เพื่อชาร์จเต็มและเริ่มวงจรใหม่`;
   $("sideStat").innerHTML=`<div style="color:#b42318;font-weight:700">🔋 แบตเตอรี่หมด:</div>`+emptyBatteries.map(p=>`🔴 ${p.id} — 0% / 0 V`).join("<br>");
   return;
  }
@@ -1935,7 +2132,19 @@ function updateStatus(){
   h.textContent="⏻ ระบบปิดอยู่ — กดปุ่ม ▶ จำลองการทำงาน ในแถบเครื่องมือ เพื่อเปิดไฟเลี้ยงวงจร";
   $("sideStat").innerHTML=S().parts.filter(p=>REQ[p.type]).map(p=>
    `⚪ ${DEF[p.type].nm}`).join("<br>")||"—";return;}
- if(!ecu||!sens.length){h.className="bad";
+ const isTrainingCircuit=!!ecu||sens.length>0;
+ if(!isTrainingCircuit){
+  const sources=S().parts.filter(p=>["BATT","PSU","AC"].includes(p.type));
+  const passiveParts=S().parts.filter(p=>!["BATT","PSU","AC","GND"].includes(p.type));
+  const sourcePins=new Set(sources.flatMap(p=>pinsFor(p).map(pin=>p.id+"."+pin[0])));
+  const hasSourceWire=S().wires.some(w=>sourcePins.has(w.a)||sourcePins.has(w.b));
+  if(!sources.length){h.className="bad";h.textContent="วางแหล่งจ่ายไฟ แล้วลากสายจากขั้วของอุปกรณ์เพื่อเริ่มต่อวงจร";}
+  else if(!hasSourceWire){h.className="bad";h.textContent="แหล่งจ่ายพร้อมแล้ว — ลากสายจากขั้วแหล่งจ่ายไปยังขาอุปกรณ์เพื่อเริ่มวงจร";}
+  else{h.className="ok";h.textContent=`⚡ กำลังจำลองวงจรทั่วไป — แหล่งจ่าย ${sources.length} จุด, อุปกรณ์ ${passiveParts.length} ชิ้น, สาย ${S().wires.length} เส้น`;}
+  $("sideStat").innerHTML=`<div style="color:${hasSourceWire?"#0a7d3f":"#b54708"};font-weight:700">${hasSourceWire?"🟢 เชื่อมต่อแหล่งจ่ายแล้ว":"🟡 รอเชื่อมต่อแหล่งจ่าย"}</div>`+
+   sources.map(p=>`⚡ ${DEF[p.type].nm} (${p.id})`).join("<br>")+`<br>🔗 สายไฟ ${S().wires.length} เส้น`;
+ }
+ else if(!ecu||!sens.length){h.className="bad";
   h.textContent="① วางกล่อง ECU  ② วางเซ็นเซอร์  ③ ลากสายจากขาเซ็นเซอร์ไปยังขา ECU";}
  else{const bad=sens.filter(p=>!wiredOK(p));
   if(!bad.length){h.className="ok";h.textContent="✅ ต่อวงจรถูกต้องครบทุกตัว — เริ่มวัดค่าได้เลย";}
@@ -1958,7 +2167,7 @@ function buildInspector(){
    คลิกเลือกชิ้นส่วนบนแผงวงจร เพื่อปรับค่าจำลอง เช่น อุณหภูมิ / คันเร่ง / รอบเครื่อง / ความต้านทาน</div>`;
   $("note").textContent="เลือกชิ้นส่วนเพื่อดูค่ามาตรฐาน";
   $("tbl").querySelector("tbody").innerHTML="";return;}
- let html=`<div class="t">${DEF[p.type].ic} ${DEF[p.type].nm}
+ let html=`<div class="t">${DEF[p.type].ic} ${componentName(p)}
    <span style="color:#8b949e">(${p.id})</span></div>`;
  if(ELECTRICAL[p.type])html+=`<div style="font-size:11px;color:#5c6874;line-height:1.45;margin:-2px 0 8px">⚡ ${ELECTRICAL[p.type]}</div>`;
  if(CTRL[p.type]&&p.type!=="RES"){
@@ -1971,6 +2180,11 @@ function buildInspector(){
     style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas">
    <b style="width:auto;color:#6b7784">${u}</b></div>`;
  }
+ if(p.type==="DIODE"){
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">การจัดวางไดโอด 1N4007</div>
+   <div style="font-size:11px;color:#5c6874;line-height:1.55">ปลายดำ = A (Anode) • แถบเงิน = K (Cathode)<br>มุมปัจจุบัน: <b>${diodeRotation(p)}°</b></div>
+   <button class="tb" id="btnRotateDiode" type="button" style="margin-top:7px;padding:5px 8px">↻ หมุน 45°</button></div>`;
+ }
  if(p.type==="BATT"){
   const capValue=batteryCapacityDisplay(p),unit=batteryCapacityUnit(p);
   html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">การจำลองแบตเตอรี่</div>
@@ -1982,7 +2196,7 @@ function buildInspector(){
     กำลังขาออก: <b id="battActualP">${fmtW(p.actualPower||0)}</b><br>
     ความจุคงเหลือ: <b id="battRemaining">${batteryRemainingDisplay(p)}</b><br>
     SOC: <b id="battSoc">${batterySoc(p).toFixed(1)}%</b> • OCV <b id="battOcv">${fmtV(batteryOpenVoltage(p))}</b></div>
-   <div class="fld" style="margin-bottom:0"><button class="tb" id="battRecharge" type="button" style="padding:5px 8px">🔋 ชาร์จเต็ม 100%</button><span id="battState" style="font-size:10.5px;color:${batteryIsEmpty(p)?"#b42318":"#0a7d3f"}">${batteryIsEmpty(p)?"แบตหมด — วงจรถูกตัด":"พร้อมจ่ายไฟ"}</span></div></div>`;
+   <div class="fld" style="margin-bottom:0">${batteryIsEmpty(p)?'<button class="tb" id="battRecharge" type="button" style="padding:5px 8px">↻ ชาร์จใหม่ 100%</button>':''}<span id="battState" style="font-size:10.5px;color:${batteryIsEmpty(p)?"#b42318":"#0a7d3f"}">${batteryIsEmpty(p)?"แบตหมด — กดปุ่มชาร์จใหม่บน Canvas":"พร้อมจ่ายไฟ"}</span></div></div>`;
  }
  if(p.type==="RES"){
   const bands=resistorBandSet(p),count=bands.length,ratio=(Number(p.actualPower)||0)/resistorRatedPower(p);
@@ -2004,10 +2218,14 @@ function buildInspector(){
    ${p.on?lbl[0]:lbl[1]} — คลิกเพื่อสลับ</b></div>`;
  }
   if(p.type==="RELAY"){
-   html+=`<div style="font-size:11px;color:#6b7784">คอยล์ (85-86): <b style="color:${p.energized?"#0a7d3f":"#c0392b"}">
-   ${p.energized?"ทำงาน (พลังงานครบวงจร)":"ไม่ทำงาน"}</b><br>
-   ขา 30 (COM) ต่อกับ <b style="color:${p.energized?"#0a7d3f":"#8b949e"}">ขา 87 (NO)</b> ${p.energized?"◀ ปัจจุบัน":""}
-   / <b style="color:${!p.energized?"#0a7d3f":"#8b949e"}">ขา 87a (NC)</b> ${!p.energized?"◀ ปัจจุบัน":""}</div>`;
+   const isSpdt=relayType(p)==="SPDT";
+   html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">ชนิดรีเลย์</div>
+    <div class="fld"><label>หน้าสัมผัส</label><select id="relayType"><option value="SPST" ${!isSpdt?"selected":""}>รีเลย์ 4 ขา (SPST)</option><option value="SPDT" ${isSpdt?"selected":""}>รีเลย์ 5 ขา (SPDT)</option></select></div>
+    <div style="font-size:11px;color:#6b7784;line-height:1.55">ขั้วที่ใช้งาน: <b>Coil+ / Coil− / COM / NO${isSpdt?" / NC":""}</b>${!isSpdt?"<br>รุ่น SPST ไม่มีขา NC":""}</div></div>
+    <div style="font-size:11px;color:#6b7784">คอยล์ (85-86): <b style="color:${p.energized?"#0a7d3f":"#c0392b"}">
+    ${p.energized?"ทำงาน (พลังงานครบวงจร)":"ไม่ทำงาน"}</b><br>
+    ขา 30 (COM) ต่อกับ <b style="color:${p.energized?"#0a7d3f":"#8b949e"}">ขา 87 (NO)</b> ${p.energized?"◀ ปัจจุบัน":""}
+    ${isSpdt?`/ <b style="color:${!p.energized?"#0a7d3f":"#8b949e"}">ขา 87a (NC)</b> ${!p.energized?"◀ ปัจจุบัน":""}`:""}</div>`;
   }
   if(p.type==="LEDp"){
    const spec=ledSpec(p),colors=Object.entries(LED_SPECS).map(([key,item])=>
@@ -2047,6 +2265,12 @@ function buildInspector(){
  if($("numV"))$("numV").addEventListener("change",e=>{
   const[,lo,hi]=CTRL[p.type];let v=+e.target.value;if(isNaN(v))v=lo;
   v=Math.max(lo,Math.min(hi,v));p.val=v;render();});
+ if($("relayType"))$("relayType").onchange=e=>{
+  snap();p.relayType=e.target.value==="SPST"?"SPST":"SPDT";
+  /* A four-pin unit has no NC terminal; retain every valid connection. */
+  if(relayType(p)==="SPST")S().wires=S().wires.filter(w=>w.a!==p.id+".NC"&&w.b!==p.id+".NC");
+  p.energized=false;render();
+ };
  if($("battVoltage")){
   const saveBattery=()=>{const oldSoc=batterySoc(p);snap();
    p.battVoltage=Math.max(1,Math.min(96,Number($("battVoltage").value)||12));
@@ -2060,9 +2284,9 @@ function buildInspector(){
   $("battUnit").onchange=()=>{const physicalCapacity=batteryCapacityAh(p),oldSoc=batterySoc(p);snap();
    p.battCapacityUnit=$("battUnit").value==="mAh"?"mAh":"Ah";p.battCapacity=p.battCapacityUnit==="mAh"?physicalCapacity*1000:physicalCapacity;
    p.remainingAh=physicalCapacity*oldSoc/100;render();};
-  $("battRecharge").onclick=()=>{snap();p.remainingAh=batteryCapacityAh(p);p.batteryEmpty=false;p.batteryEmptyAlerted=false;p.outputCurrent=0;p.actualPower=0;
-   if(S().batteryAlert?.partId===p.id)S().batteryAlert=null;render();};
+ if($("battRecharge"))$("battRecharge").onclick=()=>rechargeBattery(p);
  }
+ if($("btnRotateDiode"))$("btnRotateDiode").onclick=()=>{snap();p.rot=(diodeRotation(p)+45)%360;render();};
  if($("resBandCount")){
   $("resBandCount").onchange=e=>{const value=resistorResistance(p),tolerance=resistorBandSet(p).at(-1);snap();p.resBandCount=Number(e.target.value)===5?5:4;
    p.resBands=resistorValueToBands(value,p.resBandCount,tolerance);p.resTolerance=p.resBands.at(-1);p.val=resistorBandsToValue(p);render();};
@@ -2074,8 +2298,8 @@ function buildInspector(){
  }
   if($("toggleBtn")){
   if(p.type==="PB"){
-   $("toggleBtn").onpointerdown=e=>{e.preventDefault();if(!p.on){snap();p.on=true;render();}momentaryPb=p;};
-   }else $("toggleBtn").onclick=()=>{snap();p.on=!p.on;render();};
+   $("toggleBtn").onpointerdown=e=>{e.preventDefault();if(!p.on){snap();p.on=true;playUiSound("click");render();}momentaryPb=p;};
+   }else $("toggleBtn").onclick=()=>{snap();p.on=!p.on;playUiSound("click");render();};
   }
   if($("ledColor"))$("ledColor").onchange=e=>{snap();p.ledColor=e.target.value;render();};
   if($("bulbRatedV")&&$("bulbRatedW")){
@@ -2139,9 +2363,12 @@ function updateLivePropertyPanel(){
 /* ═══════════════════════════════════════════════════════════
    ขั้นที่ 9 : วนอัปเดตเรียลไทม์
    ═══════════════════════════════════════════════════════════ */
+let lastDynamicCanvasRender=0;
 function loop(){
  const {V,R,topologyChanged}=solveAll();
- if(topologyChanged)render();
+ const dynamicVisuals=S().parts.some(p=>p.type==="AC"||p.type==="LEDp"||p.type==="BULB");
+ if(topologyChanged||(dynamicVisuals&&performance.now()-lastDynamicCanvasRender>66)){lastDynamicCanvasRender=performance.now();render();}
+ syncBuzzerAudio(V);
  updateLivePropertyPanel();
  const rd=dmmRead(V,R,$("chkDisc").checked);
  const lv=document.getElementById("lcdVal"),lu=document.getElementById("lcdUnit"),
@@ -2187,14 +2414,21 @@ function bindZoomButton(el, handler){
 bindZoomButton($("btnZoomOut"),()=>zoomByStep(-1));
 bindZoomButton($("btnZoomIn"),()=>zoomByStep(1));
 bindZoomButton($("zoomPct"),()=>resetZoomCenter());
+$("btnAudio").addEventListener("click",()=>setAudioEnabled(!audioEnabled));
+updateAudioButton();
 
-/* Mouse wheel ซูม (PC) — ซูมรอบจุดใต้เมาส์ */
+/* Scroll only the workspace: wheel = vertical, Shift+wheel = horizontal.
+   Hold Ctrl while using the wheel when zooming around the pointer is wanted. */
 const stageWrapEl=$("stageWrap");
 if(stageWrapEl){
   stageWrapEl.addEventListener("wheel",e=>{
-    e.preventDefault();
-    const dir=e.deltaY<0?1:-1;
-    zoomByStep(dir, e.clientX, e.clientY);
+    if(e.ctrlKey){
+      e.preventDefault();
+      zoomByStep(e.deltaY<0?1:-1,e.clientX,e.clientY);
+    }else if(e.shiftKey){
+      e.preventDefault();
+      stageWrapEl.scrollLeft+=e.deltaX||e.deltaY;
+    }
   },{passive:false});
 }
 
@@ -2226,15 +2460,16 @@ if(stageWrapEl){
       let next=pinchState.startScale*ratio;
       next=Math.max(ZOOM_STEPS[0],Math.min(ZOOM_STEPS[ZOOM_STEPS.length-1],next));
       const rect=stageWrapEl.getBoundingClientRect();
-      const originX=rect.left, originY=rect.top;
-      const worldX=(pinchState.centerX-originX-pinchState.startPanX)/pinchState.startScale;
-      const worldY=(pinchState.centerY-originY-pinchState.startPanY)/pinchState.startScale;
+      const originX=rect.left, originY=rect.top,scrollLeft=stageWrapEl.scrollLeft,scrollTop=stageWrapEl.scrollTop;
+      const worldX=(pinchState.centerX-originX+scrollLeft-pinchState.startPanX)/pinchState.startScale;
+      const worldY=(pinchState.centerY-originY+scrollTop-pinchState.startPanY)/pinchState.startScale;
       zoomScale=next;
       zoomIdx=nearestZoomIdx(next);
-      panX=c.x-originX-worldX*next;
-      panY=c.y-originY-worldY*next;
+      panX=0;panY=0;
       pinchState.lastCenter=c;
       applyViewportTransform();
+      stageWrapEl.scrollLeft=Math.max(0,worldX*next-(c.x-originX));
+      stageWrapEl.scrollTop=Math.max(0,worldY*next-(c.y-originY));
     }
   },{passive:false});
   stageWrapEl.addEventListener("touchend",e=>{
