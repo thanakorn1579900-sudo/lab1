@@ -94,9 +94,19 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 .wire-sleeve{fill:none;stroke:#111820;stroke-width:8;stroke-linecap:round;pointer-events:none}
 .wire-core{fill:none;stroke-width:4.2;stroke-linecap:round;pointer-events:stroke}
 .wire-flow{fill:none;stroke-width:1.35;stroke:#fff7b2;stroke-linecap:round;stroke-dasharray:2 13;opacity:0;pointer-events:none}
-.wire-flow.live{opacity:.95;animation:currentFlow .74s linear infinite}
+.wire-flow.live{opacity:.95;animation:currentFlow 1.65s linear infinite}
 .wire-flow.reverse{animation-direction:reverse}
 .wire-terminal{stroke:#111820;stroke-width:1.2;pointer-events:none}
+/* End-point controls deliberately sit above the wire: they are actual drag
+   handles, not merely a decorative terminal.  Pointer Events cover mouse,
+   pen and touch with the same implementation. */
+.wire-handle{cursor:grab;touch-action:none;pointer-events:all}
+.wire-handle:active{cursor:grabbing}
+.wire-handle-outer{fill:#df3e3e;stroke:#681a1a;stroke-width:1.4}
+.wire-handle-inner{fill:#fff6d6;pointer-events:none}
+.wire-junction{fill:#f2c94c;stroke:#9b2c2c;stroke-width:1.6;pointer-events:none}
+.wire-menu-color{cursor:pointer;pointer-events:all}
+.wire-menu-color:hover .wire-menu-color-bg{stroke:#fff6c7;stroke-width:2.2}
 .device-card,#selectionL{overflow:visible}
 .canvas-delete{cursor:pointer;pointer-events:all;position:absolute;z-index:100}
 .component-delete{overflow:visible}
@@ -118,6 +128,44 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 .relay-pin-label{display:flex;flex-direction:column;align-items:center;text-align:center;white-space:nowrap;
                  color:#344454;font-family:Tahoma,"Segoe UI",sans-serif;font-size:8.5px;font-weight:700;line-height:1.08}
 .relay-pin-label .terminal-number{font-size:7.3px;font-weight:700;color:#7a5b18;margin-top:1px}
+.standard-pin-label-box{overflow:visible;pointer-events:none}
+.standard-pin-label{display:flex;flex-direction:column;align-items:center;text-align:center;white-space:nowrap;
+                    color:#344454;font-family:Tahoma,"Segoe UI",sans-serif;font-size:8.5px;font-weight:700;line-height:1.08}
+.standard-pin-label .terminal-number{font-size:6.8px;font-weight:700;color:#6d5a28;margin-top:1px}
+.sensor-pin-label-box{overflow:visible;pointer-events:none}
+.sensor-pin-label{display:flex;flex-direction:column;align-items:center;text-align:center;white-space:nowrap;
+                  color:#344454;font-family:Tahoma,"Segoe UI",sans-serif;font-size:7.6px;font-weight:700;line-height:1.08}
+.sensor-pin-label .sensor-terminal-detail{font-size:6.3px;font-weight:600;color:#637487;margin-top:1px}
+.app-sensor-pin-label{font-size:7px}
+.app-sensor-pin-label .sensor-terminal-detail{font-size:5.6px;letter-spacing:-.1px}
+.ref-live{font-weight:700;text-align:center;white-space:nowrap}
+.ref-live.ok{color:#087a3f;background:#e7f8ec}.ref-live.bad{color:#b42318;background:#fff0ef}
+.ref-live.wait{color:#6b7784;background:#f5f7fa}
+/* Canvas backgrounds retain a strong wire outline and bright current flow on
+   the two dark electronics surfaces. */
+#stage[data-canvas-theme="pcb"] .wire-sleeve{stroke:#d9efd0}
+#stage[data-canvas-theme="pcb"] .wire-flow{stroke:#fff6a8}
+#stage[data-canvas-theme="blueprint"] .wire-sleeve{stroke:#e6f4ff}
+#stage[data-canvas-theme="blueprint"] .wire-flow{stroke:#fff3a3}
+/* Night mode affects application chrome only; the selected work-surface
+   background continues to be governed by the canvas theme selector. */
+body.night-mode{background:#12121c;color:#e7eaf2}
+body.night-mode #slidebar,body.night-mode #toolbar,body.night-mode #palette,
+body.night-mode #side,body.night-mode #dock,body.night-mode .tabs{background:#1e1e2e;border-color:#34354a}
+body.night-mode .tb,body.night-mode .pi,body.night-mode .sbox,body.night-mode .insp,
+body.night-mode .tab,body.night-mode #hint,body.night-mode table{background:#27283a;color:#e7eaf2;border-color:#45475e}
+body.night-mode .tb:hover,body.night-mode .pi:hover,body.night-mode .tab:hover{background:#35364d}
+body.night-mode .tb.act,body.night-mode .tab.on{background:#3b82f6;border-color:#3b82f6;color:#fff}
+body.night-mode select,body.night-mode input:not([type="range"]){background:#191a28;color:#eef2ff;border-color:#555875}
+body.night-mode .fld label,body.night-mode #hint,body.night-mode .sbox,body.night-mode td{color:#c5c9dc}
+body.night-mode th{background:#303149;color:#dce3f5}
+body.night-mode td{border-color:#41435a}
+body.night-mode #note{background:#172f4f;color:#b8ddff}
+body.night-mode .insp .t{color:#8abaff}
+body.night-mode #zoomPanel{background:rgba(30,30,46,.96);border-color:#45475e}
+body.night-mode #zoomPanel .zb,body.night-mode #zoomPct{background:#292a3d;color:#dce8ff}
+body.night-mode #zoomPanel .zb:hover,body.night-mode #zoomPct:hover{background:#3a3b54}
+body.night-mode .mobile-panel-close,body.night-mode #mobilePanelActions button{background:#292a3d;color:#edf2ff}
 .component-settings{cursor:pointer}
 .component-settings:hover .component-settings-bg{fill:#1f6feb;stroke:#fff}
 @keyframes currentFlow{to{stroke-dashoffset:-15}}
@@ -243,6 +291,7 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 
 <!-- ═══ Zoom Controls (fixed มุมขวาบน) ═══ -->
 <div id="zoomPanel" role="toolbar" aria-label="ควบคุมการซูม">
+  <button type="button" class="zb" id="btnDark" title="เปิดโหมดกลางคืน" aria-label="เปิดโหมดกลางคืน" aria-pressed="false">🌙</button>
   <button type="button" class="zb" id="btnAudio" title="เปิดเสียง" aria-label="เปิดเสียง" aria-pressed="false">🔇</button>
   <button type="button" class="zb" id="btnZoomOut" title="ซูมออก (−)" aria-label="ซูมออก">−</button>
   <button type="button" id="zoomPct" title="รีเซ็ตซูม 100% และจัดกึ่งกลาง" aria-label="รีเซ็ตซูม 100%">
@@ -262,7 +311,10 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
   <div class="tb" id="btnClear">🧹 ล้างแผงวงจร</div>
   <div class="tb" id="btnDel">🗑 ลบที่เลือก</div>
   <div class="tb" id="btnUndo">↶ ย้อนกลับ</div>
-  <div class="tb" id="btnRedo">↷ ทำซ้ำ</div><div class="sep"></div>
+  <div class="tb" id="btnRedo">↷ ทำซ้ำ</div>
+  <div class="tb" id="btnWireTool" title="เลือกแล้วลากจากพินหรือจุดกริดไปยังปลายทาง">🟡 สายไฟ</div><div class="sep"></div>
+  <label for="canvasTheme" style="font-size:12px;color:#6b7784">พื้นหลัง:</label>
+  <select id="canvasTheme" aria-label="เลือกลายพื้นหลัง Canvas" style="max-width:178px"><option value="perfboard">🟡 แผ่นไข่ปลา</option><option value="breadboard">▦ Breadboard Grid</option><option value="pcb">▤ PCB Board</option><option value="blueprint">▦ Blueprint</option><option value="notebook">📓 กระดาษสมุด</option></select><div class="sep"></div>
   <label style="font-size:12px;color:#6b7784">จำลองอาการเสีย:</label>
   <select id="selFault" style="max-width:230px"></select><div class="sep"></div>
   <div class="tb" id="btnAns">💡 เฉลยการต่อสาย</div>
@@ -284,6 +336,8 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
       <div class="kk"><b>คลิก</b>เลือกชิ้นส่วน</div>
       <div class="kk"><b>ลาก</b>ย้ายตำแหน่ง</div>
       <div class="kk"><b>ขา→ขา</b>ต่อสายไฟ</div>
+      <div class="kk"><b>ปลายแดง</b>ลากย้ายขั้ว / ปักกริด</div>
+      <div class="kk"><b>คลิกสาย</b>ลบหรือเปลี่ยนสี</div>
       <div class="kk"><b>คลิกขวา</b>ลบสาย</div>
       <div class="kk"><b>D</b>ลบชิ้นที่เลือก</div>
       <div class="kk"><b>↑↓←→</b>ขยับ</div>
@@ -298,6 +352,24 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
       <defs>
         <pattern id="peg" width="16" height="16" patternUnits="userSpaceOnUse">
           <circle cx="8" cy="8" r="1.7" fill="#a9af40"/></pattern>
+        <pattern id="breadboard" width="20" height="20" patternUnits="userSpaceOnUse">
+          <rect width="20" height="20" fill="#f8f5ea"/><path d="M0 3.5H20" stroke="#e36c66" stroke-width="1.3" opacity=".78"/>
+          <path d="M0 16.5H20" stroke="#5b91d5" stroke-width="1.3" opacity=".78"/><circle cx="5" cy="10" r="1.15" fill="#c8cdd3"/><circle cx="15" cy="10" r="1.15" fill="#c8cdd3"/>
+          <path d="M10 6v8" stroke="#dde1e5" stroke-width=".7"/>
+        </pattern>
+        <pattern id="pcb" width="32" height="32" patternUnits="userSpaceOnUse">
+          <rect width="32" height="32" fill="#0f6048"/><path d="M0 8h14v8h18M6 0v8m18 8v16" fill="none" stroke="#61aa83" stroke-width="1.2" opacity=".72"/>
+          <circle cx="14" cy="8" r="2" fill="#d5b55c"/><circle cx="14" cy="16" r="2" fill="#d5b55c"/><circle cx="24" cy="16" r="2" fill="#d5b55c"/>
+          <path d="M0 24h32M8 0v32" stroke="#77ba93" stroke-width=".45" opacity=".28"/>
+        </pattern>
+        <pattern id="blueprint" width="24" height="24" patternUnits="userSpaceOnUse">
+          <rect width="24" height="24" fill="#153d62"/><path d="M0 0H24V24H0Z" fill="none" stroke="#72b5db" stroke-width=".55" opacity=".58"/>
+          <path d="M12 0V24M0 12H24" stroke="#a4d5ef" stroke-width=".85" opacity=".46"/>
+        </pattern>
+        <pattern id="notebook" width="240" height="24" patternUnits="userSpaceOnUse">
+          <rect width="240" height="24" fill="#fffef7"/><path d="M0 22.5H240" stroke="#b8d9ef" stroke-width=".8" opacity=".88"/>
+          <path d="M34 0V24" stroke="#ef9999" stroke-width="1.15" opacity=".8"/>
+        </pattern>
         <filter id="deviceShadow" x="-15%" y="-15%" width="135%" height="145%">
           <feDropShadow dx="0" dy="2" stdDeviation="1.6" flood-color="#344050" flood-opacity=".34"/>
         </filter>
@@ -351,7 +423,8 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 
     <div class="pane" id="pane-ref">
       <div id="note"></div>
-      <table id="tbl"><thead><tr><th>เงื่อนไข</th><th>ค่า</th><th>ต่ำสุด</th>
+      <div id="refLiveSummary" style="display:none"></div>
+      <table id="tbl"><thead><tr><th>เงื่อนไข</th><th>ค่าที่วัด</th><th>ต่ำสุด</th>
         <th>มาตรฐาน</th><th>สูงสุด</th><th>วิธีวัด</th></tr></thead><tbody></tbody></table>
     </div>
   </aside>
@@ -393,7 +466,7 @@ const batteryOpenVoltage=p=>{const soc=batterySoc(p)/100;return soc<=.0001?0:bat
 const batteryInternalResistance=p=>Math.max(.002,batteryNominalVoltage(p)/(batteryMaxCurrent(p)*8));
 const batteryIsEmpty=p=>!!p.batteryEmpty||batterySoc(p)<=.0001;
 function batteryTerminalVoltage(p){
- if(batteryIsEmpty(p)||p.damaged)return 0;
+ if(!componentEnabled(p)||batteryIsEmpty(p)||p.damaged)return 0;
  const ocv=batteryOpenVoltage(p),draw=Math.max(0,Number(p.outputCurrent)||0),limit=batteryMaxCurrent(p);
  const loaded=Math.max(0,ocv-Math.min(draw,limit)*batteryInternalResistance(p));
  return draw>limit?loaded*Math.max(.04,limit/draw):loaded;
@@ -476,12 +549,27 @@ function resistorBandLabel(p){
 }
 function resistorColorOptions(colors,selected){return colors.map(c=>`<option value="${c}" ${c===selected?"selected":""}>${c==="none"?"ไม่มีสี (±20%)":RES_BAND[c].label}</option>`).join("");}
 function resistorBandStyle(color){const hex=color==="none"?"#f5f7fa":RES_BAND[color].hex;return `background:${hex};color:${["black","brown","blue","violet"].includes(color)?"#fff":"#1f2933"}`;}
+/* APP has two physical connector variants.  Keep their pin metadata separate
+   so the renderer, hit testing, wire netlist and property selector always
+   refer to the same terminal names. */
+const APP_PINS_6=[
+ ["VREF1","Pin 1 VREF1 5V Main","#e06c75"],["GND1","Pin 2 GND1 E1","#9aa5b1"],["APS1","Pin 3 APS1 Signal 1","#61afef"],
+ ["VREF2","Pin 4 VREF2 5V Sub","#e06c75"],["GND2","Pin 5 GND2 E2","#9aa5b1"],["APS2","Pin 6 APS2 Signal 2","#98c379"]
+];
+const APP_PINS_9=[
+ ["VREF1","Pin 1 VREF1 5V Main","#e06c75"],["GND1","Pin 2 GND1 E1","#9aa5b1"],["APP1","Pin 3 APP1 Signal 1","#61afef"],
+ ["VREF2","Pin 4 VREF2 5V Sub","#e06c75"],["GND2","Pin 5 GND2 E2","#9aa5b1"],["APP2","Pin 6 APP2 Signal 2","#98c379"],
+ ["IDLE","Pin 7 IDLE IVS Signal","#f0c36b"],["GND-I","Pin 8 GND-I IVS GND","#9aa5b1"],["NC","Pin 9 NC Shield","#858f9a"]
+];
 const DEF={
- ECU:{nm:"ECU กล่องควบคุม",ic:"🖥",w:294,fill:"#38414d",head:"#222a33",
+ ECU:{nm:"ECU กล่องควบคุม",ic:"🖥",w:606,fill:"#38414d",head:"#222a33",
   pins:[["VREF","VREF 5V","#e06c75"],["SIG-A","SIG-A (ECT)","#61afef"],
         ["SIG-B","SIG-B (TPS)","#61afef"],["SIG-C","SIG-C (CKP)","#61afef"],
         ["SIG-D","SIG-D (IAT)","#61afef"],["SIG-E","SIG-E (MAP)","#61afef"],
-        ["GND-S","SENSOR GND","#9aa5b1"],["B+","B+ 12V","#e5c07b"]]},
+        ["MAF","MAF FLOW","#61afef"],["O2","O2 SIGNAL","#61afef"],
+        ["CMP","CMP SIGNAL","#61afef"],["KNOCK","KNOCK SIGNAL","#61afef"],
+        ["APP1","APP1 / APS1","#61afef"],["APP2","APP2 / APS2","#98c379"],
+        ["IVS","IDLE / IVS","#f0c36b"],["GND-S","SENSOR GND","#9aa5b1"],["B+","B+ 12V","#e5c07b"]]},
  ECT:{nm:"ECT น้ำหล่อเย็น",ic:"🌡",w:150,fill:"#2f4858",head:"#22333f",
   pins:[["SIG","ขา1 SIG","#61afef"],["GND","ขา2 GND","#9aa5b1"]]},
  IAT:{nm:"IAT อุณหภูมิอากาศ",ic:"💨",w:150,fill:"#2f4858",head:"#22333f",
@@ -494,8 +582,23 @@ const DEF={
   pins:[["GND","ขา1 GND","#9aa5b1"],["SIG","ขา2 SIG","#98c379"],["B+","ขา3 B+","#e5c07b"]]},
  CKP_VR:{nm:"CKP แบบเหนี่ยวนำ",ic:"🧲",w:158,fill:"#2f4536",head:"#223228",
   pins:[["S+","ขา1 COIL+","#98c379"],["S-","ขา2 COIL−","#9aa5b1"]]},
+ MAF:{nm:"MAF 5 ขา (พร้อม IAT)",ic:"🌬",w:260,fill:"#29465a",head:"#1d3342",
+  pins:[["B+","Pin 1 B+ 12V","#e5c07b"],["GND","Pin 2 Ground","#9aa5b1"],["VREF","Pin 3 VREF 5V","#e06c75"],
+        ["MAF","Pin 4 Flow Signal","#61afef"],["IAT","Pin 5 Temp Signal","#98c379"]]},
+ O2:{nm:"เซ็นเซอร์ออกซิเจน O2 4 ขา",ic:"🫧",w:220,fill:"#57452d",head:"#3d301f",
+  pins:[["Heater+","Heater +","#e06c75"],["Heater-","Heater −","#9aa5b1"],["Signal+","Signal +","#61afef"],["Signal-","Signal −","#98c379"]]},
+ CMP_HALL:{nm:"CMP แบบฮอลล์",ic:"⚙",w:166,fill:"#2f4536",head:"#223228",
+  pins:[["GND","Ground","#9aa5b1"],["SIG","Signal","#98c379"],["B+","12V Supply","#e5c07b"]]},
+ CMP_VR:{nm:"CMP แบบเหนี่ยวนำ",ic:"🧲",w:166,fill:"#2f4536",head:"#223228",
+  pins:[["S+","Coil +","#98c379"],["S-","Coil −","#9aa5b1"]]},
+ KNOCK:{nm:"เซ็นเซอร์น็อค 2 ขา",ic:"🔔",w:170,fill:"#4a3d35",head:"#332923",
+  pins:[["SIG","Signal","#61afef"],["GND","Ground","#9aa5b1"]]},
+ APP:{nm:"เซ็นเซอร์คันเร่งไฟฟ้า APP",ic:"🦶",w:400,fill:"#3b4655",head:"#27313d",pins:APP_PINS_9},
  BATT:{nm:"แบตเตอรี่ 12V",ic:"🔋",w:132,fill:"#4a3b22",head:"#372c19",
   pins:[["+","ขั้วบวก +","#e06c75"],["-","ขั้วลบ −","#9aa5b1"]]},
+ IGN:{nm:"สวิตช์กุญแจ",ic:"🔑",w:192,fill:"#3b4148",head:"#222a33",
+  pins:[["ACC","อุปกรณ์เสริม ACC / ขั้ว 1","#98c379"],["IGN","ระบบจุดระเบิด IG / ขั้ว 15","#e5c07b"],
+        ["ST","สตาร์ท ST / ขั้ว 50","#e06c75"],["BAT","ไฟแบตเตอรี่ B / ขั้ว 30","#e06c75"]]},
  GND:{nm:"กราวด์ตัวถัง",ic:"⏚",w:126,fill:"#333b44",head:"#262d35",
   pins:[["G","CHASSIS","#9aa5b1"]]},
  /* ══ อุปกรณ์อิเล็กทรอนิกส์เพิ่มเติม (ตามชุดพาเลตที่แนบ) ══ */
@@ -537,6 +640,9 @@ const DEF={
   pins:[["COIL+","ขา 85 คอยล์ +","#e06c75"],["COIL-","ขา 86 คอยล์ −","#9aa5b1"],
         ["COM","ขา 30 COMMON","#f0c36b"],["NO","ขา 87 (NO)","#98c379"],
         ["NC","ขา 87a (NC)","#e06c75"]]},
+ STARTER:{nm:"มอเตอร์สตาร์ท",ic:"⚙",w:190,fill:"#37414a",head:"#222a33",
+  pins:[["S","สัญญาณโซลีนอยด์ / Terminal 50","#e06c75"],["B","ไฟแบตเตอรี่หลัก / Terminal 30","#e5c07b"],
+        ["GND","กราวด์ตัวถัง / Body","#9aa5b1"]]},
  PSU:{nm:"แหล่งจ่ายไฟ (Power Supply)",ic:"🔌",w:170,fill:"#38414d",head:"#222a33",
   pins:[["+","เอาต์พุต +","#e06c75"],["-","เอาต์พุต −","#9aa5b1"]]},
  XFMR:{nm:"หม้อแปลงไฟฟ้า",ic:"🌐",w:160,fill:"#3d3350",head:"#2d2540",
@@ -552,14 +658,64 @@ const REQ={ECT:[["SIG","SIG-A"],["GND","GND-S"]],IAT:[["SIG","SIG-D"],["GND","GN
  TPS:[["VREF","VREF"],["SIG","SIG-B"],["GND","GND-S"]],
  MAP:[["VREF","VREF"],["SIG","SIG-E"],["GND","GND-S"]],
  CKP_HALL:[["B+","B+"],["SIG","SIG-C"],["GND","GND-S"]],
- CKP_VR:[["S+","SIG-C"],["S-","GND-S"]]};
+ CKP_VR:[["S+","SIG-C"],["S-","GND-S"]],
+ MAF:[["B+","B+"],["GND","GND-S"],["VREF","VREF"],["MAF","MAF"],["IAT","SIG-D"]],
+ O2:[["Heater+","B+"],["Heater-","GND-S"],["Signal+","O2"],["Signal-","GND-S"]],
+ CMP_HALL:[["B+","B+"],["SIG","CMP"],["GND","GND-S"]],
+ CMP_VR:[["S+","CMP"],["S-","GND-S"]],
+ KNOCK:[["SIG","KNOCK"],["GND","GND-S"]],
+ APP:[["VREF1","VREF"],["GND1","GND-S"],["APS1","APP1"],["VREF2","VREF"],["GND2","GND-S"],["APS2","APP2"]]};
 const CTRL={ECT:["อุณหภูมิน้ำหล่อเย็น",-20,120,20,"°C"],IAT:["อุณหภูมิอากาศเข้า",-10,80,25,"°C"],
  TPS:["ตำแหน่งคันเร่ง",0,100,0,"%"],MAP:["ความดันสัมบูรณ์",20,101,30,"kPa"],
  CKP_HALL:["รอบเครื่องยนต์",200,6000,800,"rpm"],CKP_VR:["รอบเครื่องยนต์",200,6000,800,"rpm"],
+ MAF:["ปริมาณอากาศ",0,100,18,"%"],O2:["ส่วนผสมเชื้อเพลิง",0,100,50,"%"],
+ CMP_HALL:["รอบเครื่องยนต์",200,6000,800,"rpm"],CMP_VR:["รอบเครื่องยนต์",200,6000,800,"rpm"],
+ KNOCK:["ระดับการน็อค",0,100,0,"%"],
+ APP:["ระดับการเหยียบคันเร่ง",0,100,0,"%"],
  RES:["ค่าความต้านทาน",10,100000,220,"Ω"],LDR:["ความสว่างของแสง",0,100,50,"%"],
  POT:["ตำแหน่งแกนหมุน",0,100,50,"%"],IND:["ค่าความเหนี่ยวนำ",1,1000,100,"mH"],
  CAP:["ค่าความจุ",1,1000,100,"µF"],CAP2:["ค่าความจุ",1,4700,470,"µF"],
  PSU:["แรงดันไฟที่ตั้งไว้",0,30,12,"V"],AC:["แรงดันไฟ AC (RMS)",0,1000,220,"V"]};
+const IGNITION_STAGES=["LOCK","ACC","ON","START"];
+const IGNITION_STAGE_LABEL={LOCK:"LOCK / OFF — ตัดวงจร",ACC:"ACC — ไฟอุปกรณ์เสริม",ON:"ON / IGN — ระบบพร้อมทำงาน",START:"START — กำลังสตาร์ท"};
+const ignitionStage=p=>IGNITION_STAGES.includes(p?.ignitionStage)?p.ignitionStage:"LOCK";
+const ignitionFeeds=(p,pin)=>{
+ const stage=ignitionStage(p);
+ return (pin==="ACC"&&(stage==="ACC"||stage==="ON")) ||
+        (pin==="IGN"&&(stage==="ON"||stage==="START")) || (pin==="ST"&&stage==="START");
+};
+const ignitionReturnTimers=new Map();
+function setIgnitionStage(p,stage,spring=true){
+ const next=IGNITION_STAGES.includes(stage)?stage:"LOCK",prior=ignitionReturnTimers.get(p.id);
+ if(prior)clearTimeout(prior);
+ p.ignitionStage=next;
+ if(next==="START"&&spring){
+  ignitionReturnTimers.set(p.id,setTimeout(()=>{
+   if(ignitionStage(p)==="START"&&S().parts.includes(p)){p.ignitionStage="ON";playUiSound("click",.45);render();}
+  },750));
+ }
+}
+function cycleIgnitionStage(p){
+ const index=IGNITION_STAGES.indexOf(ignitionStage(p));setIgnitionStage(p,IGNITION_STAGES[(index+1)%IGNITION_STAGES.length]);
+}
+const starterSolenoidResistance=p=>Math.max(.5,Math.min(2,Number(p.solenoidR)||1));
+const starterMotorResistance=p=>Math.max(.08,Math.min(.15,Number(p.motorR)||.10));
+const STARTER_FAULTS={
+ NORMAL:{label:"ปกติ (Normal Operation)",detail:"เฟืองดันออกและมอเตอร์ฉุดสตาร์ทตามแรงดันจริง"},
+ CLICK_ONLY:{label:"โซลีนอยด์ดังแต๊ก แต่มอเตอร์ไม่หมุน",detail:"เฟืองดันออก แต่คอนแทคต์หลักไม่จ่ายกระแสให้มอเตอร์"},
+ FREE_SPIN:{label:"มอเตอร์หมุนฟรี / Bendix ไม่ขบ",detail:"มอเตอร์หมุนรอบสูง แต่เฟืองไม่ดันออกไปขบ"},
+ JAMMED:{label:"มอเตอร์ติดขัด / Locked Rotor",detail:"เฟืองดันออกแต่โรเตอร์ไม่หมุน กินกระแสสูงและทำให้แรงดันตก"},
+ DEAD:{label:"ขดลวดขาด / ไม่ทำงาน",detail:"วงจรเปิด ไม่มีเสียง ไม่มีการดันเฟือง และไม่ดึงกระแส"}
+};
+const starterFault=p=>STARTER_FAULTS[p?.starterFault] ? p.starterFault : "NORMAL";
+const starterCanMotorRun=p=>["NORMAL","FREE_SPIN","JAMMED"].includes(starterFault(p));
+const starterBendixShouldEngage=p=>["NORMAL","CLICK_ONLY","JAMMED"].includes(starterFault(p));
+const starterMotorLoadResistance=p=>{
+ const mode=starterFault(p),base=starterMotorResistance(p);
+ if(mode==="FREE_SPIN")return Math.max(.16,base*2.2); /* ~free-running current */
+ if(mode==="JAMMED")return .025; /* locked rotor: high current / voltage sag */
+ return mode==="NORMAL"?base:INF;
+};
 const TOGGLE_TYPES=new Set(["SW","PB","MCB","FUSE2"]);
 /* เขียนสถานะให้บอกทั้งสภาพทางไฟฟ้าและ ON/OFF จึงไม่มีความกำกวมของคำว่า “ปิด” */
 const TOGGLE_LABEL={SW:["ON — วงจรต่อ", "OFF — วงจรเปิด"],
@@ -570,8 +726,13 @@ const ELECTRICAL={
  ECU:"Reference 5.00 V, sensor ground 0.03 V, thermistor pull-up 2.2 kΩ", ECT:"NTC 2 kΩ @ 25°C, β≈3500 K",
  IAT:"NTC 2 kΩ @ 25°C, β≈3500 K", TPS:"รางตัวต้านทาน 2.4 kΩ; output 0.55–4.45 V",
  MAP:"เซ็นเซอร์ active 5 V; output ประมาณ 0.30–4.65 V", CKP_HALL:"Active Hall, B+ 13.8 V, output 0–5 V, wheel 60-2",
- CKP_VR:"ขดลวด VR 950 Ω, amplitude เพิ่มตาม rpm, wheel 60-2", GND:"ตัวถัง 0 V",
- BATT:"กำหนด V / Ah (หรือ mAh) / กระแสจ่ายสูงสุดได้; SOC และแรงดันตกตามโหลด", PSU:"0–30 V DC, จำกัดกระแสเพื่อการเรียนรู้",
+ CKP_VR:"ขดลวด VR 950 Ω, amplitude เพิ่มตาม rpm, wheel 60-2", MAF:"MAF 5 ขา + IAT: B+ 12 V, VREF 5 V, Flow 0.5–4.5 V",
+ O2:"O2 4 ขา: ฮีตเตอร์ประมาณ 8 Ω, สัญญาณ 0.1–0.9 V", CMP_HALL:"CMP Hall 3 ขา, B+ 12 V / signal 0–5 V",
+ CMP_VR:"CMP VR 2 ขา, ขดลวดประมาณ 750 Ω", KNOCK:"Knock 2 ขา, piezo sensor ความต้านทานสูง",
+ APP:"APP คันเร่งไฟฟ้าแบบสัญญาณคู่: Signal 1 = 0.8–4.2 V, Signal 2 = ครึ่งหนึ่งของ Signal 1; เลือกปลั๊ก 6/9 พินได้",
+ GND:"ตัวถัง 0 V",
+ BATT:"กำหนด V / Ah (หรือ mAh) / กระแสจ่ายสูงสุดได้; SOC และแรงดันตกตามโหลด", IGN:"สวิตช์กุญแจ 4 ตำแหน่ง: LOCK, ACC, ON และ START (สปริงกลับ ON)",
+ STARTER:"โซลีนอยด์ 0.5–2 Ω; เลือกจำลองปกติ / คลิกอย่างเดียว / หมุนฟรี / ติดขัด / ขดลวดขาดได้", PSU:"0–30 V DC, จำกัดกระแสเพื่อการเรียนรู้",
  AC:"0–1000 V RMS, 50 Hz", SW:"หน้าสัมผัส < 0.05 Ω เมื่อ ON", PB:"ปุ่มกด NO แบบ momentary, < 0.05 Ω เมื่อกด",
  MCB:"MCB 5 A, หน้าสัมผัส < 0.02 Ω เมื่อ ON", FUSE2:"ฟิวส์ 1 A, 0.05 Ω เมื่อปกติ",
  RES:"ตัวต้านทานรหัสสี 4/5 แถบ; กำหนดพิกัดกำลังได้ และขาดเป็นวงจรเปิดเมื่อร้อนเกิน", LDR:"ประมาณ 200 Ω (สว่าง) ถึง 200 kΩ (มืด)", POT:"10 kΩ linear",
@@ -587,15 +748,31 @@ const INTERNAL_EDGES={RES:[["A","B"]],LDR:[["A","B"]],POT:[["1","2"],["1","W"],[
  IND:[["A","B"]],CAP:[["+","-"]],CAP2:[["+","-"]],FUSE2:[["A","B"]],DIODE:[["A","K"]],BULB:[["A","B"]],
  BUZZ:[["+","-"]],BELL:[["A","B"]],FAN:[["A","B"]],LEDp:[["A","K"]],
  SW:[["A","B"]],PB:[["A","B"]],MCB:[["A","B"]],
+ IGN:[["BAT","ACC"],["BAT","IGN"],["BAT","ST"]],STARTER:[["S","GND"],["B","GND"]],
  RELAY:[["COIL+","COIL-"],["COM","NO"],["COM","NC"]],XFMR:[["P1","P2"],["S1","S2"]],
- OPTO:[["IN+","IN-"],["OUT+","OUT-"]]};
+ MAF:[["IAT","GND"]],O2:[["Heater+","Heater-"]],CMP_HALL:[["GND","SIG"],["SIG","B+"]],
+ CMP_VR:[["S+","S-"]],KNOCK:[["SIG","GND"]],
+ APP:[["VREF1","GND1"],["VREF2","GND2"],["IDLE","GND-I"]],OPTO:[["IN+","IN-"],["OUT+","OUT-"]]};
 function internalPass(p,pa,pb){
- if(p.damaged)return false; /* ชิ้นส่วนที่ไหม้/ขาดเป็นวงจรเปิด ทั้งในกราฟและมัลติมิเตอร์ */
+ if(!componentEnabled(p)||p.damaged)return false; /* ชิ้นส่วนที่ปิด/ไหม้/ขาดเป็นวงจรเปิด ทั้งในกราฟและมัลติมิเตอร์ */
  if(p.type==="SW"||p.type==="PB"||p.type==="MCB"||p.type==="FUSE2")return !!p.on;
  if(p.type==="RELAY"){
   if((pa==="COM"&&pb==="NO")||(pa==="NO"&&pb==="COM"))return !!p.energized;
   if((pa==="COM"&&pb==="NC")||(pa==="NC"&&pb==="COM"))return relayType(p)==="SPDT"&&!p.energized;
   return true;}
+ if(p.type==="IGN"){
+  const output=pa==="BAT"?pb:pb==="BAT"?pa:"";
+  return !!output&&ignitionFeeds(p,output);
+ }
+ if(p.type==="APP"){
+  if((pa==="IDLE"&&pb==="GND-I")||(pa==="GND-I"&&pb==="IDLE"))return appConnector(p)==="9"&&Number(p.val||0)<=1;
+  return true;
+ }
+ if(p.type==="STARTER"){
+  if((pa==="S"&&pb==="GND")||(pa==="GND"&&pb==="S"))return starterFault(p)!=="DEAD";
+  if((pa==="B"&&pb==="GND")||(pa==="GND"&&pb==="B"))return !!p.motorCircuitOn;
+  return false;
+ }
  if(p.type==="CAP"||p.type==="CAP2")return false;
  if(p.type==="XFMR"||p.type==="OPTO")return pa[0]===pb[0];
  return true;}
@@ -611,7 +788,7 @@ function buildGraph(){
 function floodOnce(){
  const adj=buildGraph();const HIGH=new Set(),LOW=new Set();
  const highSeeds=[],lowSeeds=[];let srcV=12;
- S().parts.forEach(p=>{
+ S().parts.forEach(p=>{if(!componentEnabled(p))return;
   if(p.type==="BATT"&&!batteryIsEmpty(p)&&!p.damaged){highSeeds.push(p.id+".+");lowSeeds.push(p.id+".-");srcV=batteryTerminalVoltage(p);}
   if(p.type==="PSU"){highSeeds.push(p.id+".+");lowSeeds.push(p.id+".-");srcV=p.val;}
   if(p.type==="AC"){const ac=acInstantVoltage(p);highSeeds.push(p.id+(ac>=0?".A":".B"));lowSeeds.push(p.id+(ac>=0?".B":".A"));srcV=Math.abs(ac);}
@@ -640,7 +817,13 @@ const NOTE={ECT:"NTC : ยิ่งร้อน ความต้านทา�
  TPS:"ปิดสุด ≈0.55V เปิดสุด ≈4.45V ต้องไล่ต่อเนื่อง ไม่กระโดด",
  MAP:"สุญญากาศสูง = แรงดันต่ำ / กุญแจ ON เครื่องดับ ≈4.5V",
  CKP_HALL:"คลื่นสี่เหลี่ยม 0-5V ล้อ 60-2 ฟัน • Active Sensor วัดโอห์มได้ OL",
- CKP_VR:"คลื่นไซน์ แอมป์โตตามรอบ • ขดลวดปกติ 800-1200Ω"};
+ CKP_VR:"คลื่นไซน์ แอมป์โตตามรอบ • ขดลวดปกติ 800-1200Ω",
+ MAF:"MAF มีสัญญาณ Flow 0.5–4.5V และ IAT NTC รวมอยู่ในตัวเดียว",
+ O2:"O2 แบบ 4 ขา: วัดฮีตเตอร์ก่อน แล้ววัด Signal+ เทียบ Signal−",
+ CMP_HALL:"CMP Hall: B+ 12V, GND และสัญญาณดิจิทัล 0–5V",
+ CMP_VR:"CMP VR: ตรวจขดลวดและรูปคลื่น AC เมื่อหมุนเครื่อง",
+ KNOCK:"Knock แบบ piezo: วัดความต้านทานสูง/ไม่ลัดลงกราวด์",
+ APP:"APP ใช้สัญญาณสำรองอัตราส่วน 2:1; หากไม่สัมพันธ์กัน ECU จะเข้า Limp Home พร้อม DTC"};
 const FAULTS={NONE:"ปกติ (ไม่มีอาการเสีย)",OPEN:"วงจรขาด — Open Circuit",
  SHORT_GND:"ช็อตลงกราวด์ — Short to Ground",SHORT_BP:"ช็อตไฟบวก — Short to B+",
  HIGH_R:"ความต้านทานสูงผิดปกติ — High Resistance"};
@@ -667,21 +850,77 @@ const REF=[
  ["CKP_HALL","ความต้านทานเซ็นเซอร์","R Ω",0,0,0,"Active Sensor → ต้องได้ OL"],
  ["CKP_VR","ความต้านทานขดลวด","R Ω",800,950,1200,"ถอดปลั๊ก วัดคร่อมขา 1-2"],
  ["CKP_VR","หมุนสตาร์ท ~250 rpm","VacP",0.50,0.90,1.50,"ย่าน ACV หรือสโคป"],
- ["CKP_VR","รอบเดินเบา 800 rpm","VacP",1.50,1.78,2.50,"ย่าน ACV หรือสโคป"]];
+ ["CKP_VR","รอบเดินเบา 800 rpm","VacP",1.50,1.78,2.50,"ย่าน ACV หรือสโคป"],
+ ["MAF","ไฟเลี้ยง B+","V",11.5,13.8,14.5,"วัด B+ เทียบ GND",["B+","GND"]],
+ ["MAF","แรงดันอ้างอิง","V",4.80,5.00,5.20,"วัด VREF เทียบ GND",["VREF","GND"]],
+ ["MAF","สัญญาณลมเดินเบา","V",0.50,1.20,1.80,"วัด MAF เทียบ GND",["MAF","GND"]],
+ ["MAF","สัญญาณลมเร่งสูง","V",3.50,4.20,4.70,"วัด MAF เทียบ GND",["MAF","GND"]],
+ ["MAF","IAT ที่ 25°C","R Ω",1900,2000,2200,"ถอดปลั๊ก วัด IAT เทียบ GND",["IAT","GND"]],
+ ["O2","ความต้านทานฮีตเตอร์","R Ω",5,8,14,"ถอดปลั๊ก วัด Heater+ คร่อม Heater−",["Heater+","Heater-"]],
+ ["O2","สัญญาณหลังอุ่นตัว","V",0.10,0.45,0.90,"วัด Signal+ เทียบ Signal−",["Signal+","Signal-"]],
+ ["CMP_HALL","ไฟเลี้ยง B+","V",11.5,13.8,14.5,"กุญแจ ON วัด B+ เทียบ GND",["B+","GND"]],
+ ["CMP_HALL","สัญญาณ Hall","V",0,2.50,5.00,"วัด SIG เทียบ GND หรือใช้สโคป",["SIG","GND"]],
+ ["CMP_HALL","ความต้านทานเซ็นเซอร์","R Ω",0,0,0,"Active sensor ปกติแสดง OL",["SIG","GND"]],
+ ["CMP_VR","ความต้านทานขดลวด","R Ω",600,750,900,"ถอดปลั๊ก วัด S+ คร่อม S−",["S+","S-"]],
+ ["CMP_VR","สัญญาณขณะสตาร์ท","VacP",0.30,0.70,1.20,"ใช้ ACV หรือสโคปวัด S+ คร่อม S−",["S+","S-"]],
+ ["KNOCK","ความต้านทานเซ็นเซอร์","R Ω",500000,1000000,3000000,"ถอดปลั๊ก วัด SIG เทียบ GND",["SIG","GND"]],
+ ["KNOCK","แรงดันขณะไม่มีการเคาะ","V",0,0.02,0.10,"วัด SIG เทียบ GND",["SIG","GND"]],
+ ["APP","ไฟเลี้ยง VREF1","V",4.80,5.00,5.20,"วัด VREF1 เทียบ GND1",["VREF1","GND1"],"6"],
+ ["APP","ไฟเลี้ยง VREF2","V",4.80,5.00,5.20,"วัด VREF2 เทียบ GND2",["VREF2","GND2"],"6"],
+ ["APP","ไม่เหยียบคันเร่ง 0% — APS1","V",0.70,0.80,0.90,"วัด APS1 เทียบ GND1",["APS1","GND1"],"6"],
+ ["APP","ไม่เหยียบคันเร่ง 0% — APS2","V",0.30,0.40,0.50,"วัด APS2 เทียบ GND2",["APS2","GND2"],"6"],
+ ["APP","เหยียบคันเร่งสุด 100% — APS1","V",4.00,4.20,4.50,"วัด APS1 เทียบ GND1",["APS1","GND1"],"6"],
+ ["APP","เหยียบคันเร่งสุด 100% — APS2","V",2.00,2.10,2.30,"วัด APS2 เทียบ GND2",["APS2","GND2"],"6"],
+ ["APP","ความต้านทานแทร็ก","R Ω",1500,2400,3000,"ถอดปลั๊ก วัด VREF1 เทียบ GND1",["VREF1","GND1"],"6"],
+ ["APP","ไฟเลี้ยง VREF1","V",4.80,5.00,5.20,"วัด VREF1 เทียบ GND1",["VREF1","GND1"],"9"],
+ ["APP","ไฟเลี้ยง VREF2","V",4.80,5.00,5.20,"วัด VREF2 เทียบ GND2",["VREF2","GND2"],"9"],
+ ["APP","ไม่เหยียบคันเร่ง 0% — APP1","V",0.70,0.80,0.90,"วัด APP1 เทียบ GND1",["APP1","GND1"],"9"],
+ ["APP","ไม่เหยียบคันเร่ง 0% — APP2","V",0.35,0.40,0.45,"วัด APP2 เทียบ GND2",["APP2","GND2"],"9"],
+ ["APP","ไม่เหยียบคันเร่ง 0% — IVS","V",0,0,0.10,"วัด IDLE เทียบ GND-I",["IDLE","GND-I"],"9"],
+ ["APP","เหยียบคันเร่งสุด 100% — APP1","V",4.00,4.20,4.40,"วัด APP1 เทียบ GND1",["APP1","GND1"],"9"],
+ ["APP","เหยียบคันเร่งสุด 100% — APP2","V",2.00,2.10,2.20,"วัด APP2 เทียบ GND2",["APP2","GND2"],"9"],
+ ["APP","เหยียบคันเร่งสุด 100% — IVS","V",4.80,5.00,5.20,"วัด IDLE เทียบ GND-I",["IDLE","GND-I"],"9"],
+ ["APP","IVS ไม่เหยียบ — สวิตช์ต่อกราวด์","R Ω",0,0,0.10,"ถอดปลั๊ก วัด IDLE คร่อม GND-I",["IDLE","GND-I"],"9"],
+ ["APP","IVS เหยียบ >1% — สวิตช์เปิด","OL",Infinity,Infinity,Infinity,"ถอดปลั๊ก วัด IDLE คร่อม GND-I ต้องได้ OL",["IDLE","GND-I"],"9"]];
 
 /* ═══════════════════════════════════════════════════════════
    ขั้นที่ 3 : สถานะโปรแกรม + ระบบสไลด์
    ═══════════════════════════════════════════════════════════ */
-let slides=[{parts:[],wires:[]}],cur=0,seq=1,sel=null,selWire=null,arm=null,hist=[],future=[],momentaryPb=null,toastTimer=null,lastBatteryTick=0;
+let slides=[{parts:[],wires:[]}],cur=0,seq=1,sel=null,selWire=null,arm=null,hist=[],future=[],momentaryPb=null,ignitionStartHold=null,toastTimer=null,lastBatteryTick=0,inspectorEdit=null;
 let PIN_I={};   // กระแส (A) โดยประมาณที่แต่ละขา อ้างอิงจากแขนงต้านทานที่ขานั้นสังกัดอยู่ — ใช้แสดงป้าย mA/A บนสายไฟ
 let running=true;    // ⏻ สถานะเปิด/ปิดการจำลอง (ควบคุมจากปุ่ม ▶ ในแถบเครื่องมือ ค่าเริ่มต้น = เปิด)
 const S=()=>slides[cur], $=id=>document.getElementById(id);
 const stage=$("stage"),wireL=$("wireL"),partL=$("partL"),instrL=$("instrL"),selectionL=$("selectionL"),tmpW=$("tmpW");
 const viewport=$("viewport");
+/* Work-surface and UI preferences are local to this browser.  Storage calls
+   are guarded so the simulator still runs in restricted/file-preview modes. */
+const THEME_PREF_KEY="auto-sensor-lab.canvas-theme",NIGHT_PREF_KEY="auto-sensor-lab.night-mode";
+const CANVAS_THEMES={
+ perfboard:{background:"#d2d267",pattern:"url(#peg)"},
+ breadboard:{background:"#f8f5ea",pattern:"url(#breadboard)"},
+ pcb:{background:"#0a4e3b",pattern:"url(#pcb)"},
+ blueprint:{background:"#123758",pattern:"url(#blueprint)"},
+ notebook:{background:"#fffef7",pattern:"url(#notebook)"}
+};
+const readPreference=(key,fallback)=>{try{return localStorage.getItem(key)??fallback;}catch{return fallback;}};
+const writePreference=(key,value)=>{try{localStorage.setItem(key,value);}catch{}};
+function applyCanvasTheme(value,persist=true){
+ const theme=CANVAS_THEMES[value]?value:"perfboard",config=CANVAS_THEMES[theme],background=$("stageBg"),pattern=$("stagePeg"),selector=$("canvasTheme");
+ if(background)background.setAttribute("fill",config.background);if(pattern)pattern.setAttribute("fill",config.pattern);
+ if(stage)stage.dataset.canvasTheme=theme;if(selector&&selector.value!==theme)selector.value=theme;
+ if(persist)writePreference(THEME_PREF_KEY,theme);
+}
+function setNightMode(enabled,persist=true){
+ const active=!!enabled,button=$("btnDark");document.body.classList.toggle("night-mode",active);
+ if(button){button.textContent=active?"☀️":"🌙";button.title=active?"กลับสู่โหมดสว่าง":"เปิดโหมดกลางคืน";button.setAttribute("aria-label",button.title);button.setAttribute("aria-pressed",String(active));}
+ if(persist)writePreference(NIGHT_PREF_KEY,active?"1":"0");
+}
 
 /* ═══ Audio feedback (muted until the user explicitly enables it) ═══ */
 let audioEnabled=false,audioContext=null,audioMaster=null,audioAssets=null;
 const buzzerVoices=new Map();
+const starterVoices=new Map();
+const starterAudioStates=new Map();
 function makeAudioBuffer(ctx,duration,writer){
  const frames=Math.max(1,Math.floor(ctx.sampleRate*duration)),buffer=ctx.createBuffer(1,frames,ctx.sampleRate),data=buffer.getChannelData(0);
  for(let i=0;i<frames;i++)data[i]=writer(i/ctx.sampleRate,i/frames);
@@ -692,6 +931,7 @@ function preloadAudioAssets(ctx){
  /* In-memory, synthesized assets remove playback latency without loading MP3 files. */
  audioAssets={
   click:makeAudioBuffer(ctx,.07,(t,n)=>(Math.random()*2-1)*Math.exp(-t*55)*.32+Math.sin(t*2*Math.PI*1700)*Math.exp(-t*48)*.18),
+  solenoid:makeAudioBuffer(ctx,.09,(t,n)=>((Math.random()*2-1)*.35+Math.sin(t*2*Math.PI*(1350-380*n))*.42)*Math.exp(-t*42)),
   fault:makeAudioBuffer(ctx,.20,(t,n)=>((Math.random()*2-1)*.50+Math.sin(t*2*Math.PI*(260-150*n))*.45)*Math.exp(-t*18)),
   alert:makeAudioBuffer(ctx,.26,(t,n)=>(Math.sin(t*2*Math.PI*(t<.12?880:1320))*.28)*Math.exp(-t*7))
  };
@@ -716,17 +956,42 @@ function stopBuzzerVoice(id){
  try{voice.osc.stop(now+.08);}catch(err){}buzzerVoices.delete(id);
 }
 function stopAllBuzzerVoices(){[...buzzerVoices.keys()].forEach(stopBuzzerVoice);}
+function stopStarterVoice(id){
+ const voice=starterVoices.get(id);if(!voice||!audioContext)return;
+ const now=audioContext.currentTime;voice.gain.gain.cancelScheduledValues(now);voice.gain.gain.setTargetAtTime(0,now,.025);
+ try{voice.osc.stop(now+.10);}catch(err){}starterVoices.delete(id);
+}
+function stopAllStarterVoices(){[...starterVoices.keys()].forEach(stopStarterVoice);}
+function syncStarterAudio(){
+ const starters=S().parts.filter(p=>p.type==="STARTER"),seen=new Set(starters.map(p=>p.id));
+ starters.forEach(p=>{const prior=starterAudioStates.get(p.id),engaged=!!p.solenoidEngaged;
+  if(engaged&&!prior?.engaged)playUiSound("solenoid",.95);
+  starterAudioStates.set(p.id,{engaged});
+ });
+ [...starterAudioStates.keys()].filter(id=>!seen.has(id)).forEach(id=>starterAudioStates.delete(id));
+ if(!audioEnabled||!audioContext||audioContext.state!=="running"){stopAllStarterVoices();return;}
+ const active=new Set(),now=audioContext.currentTime;
+ starters.filter(p=>p.motorSpinning&&!p.damaged).forEach(p=>{
+  active.add(p.id);const free=starterFault(p)==="FREE_SPIN";let voice=starterVoices.get(p.id);
+  if(!voice||voice.free!==free){if(voice)stopStarterVoice(p.id);const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=free?"square":"sawtooth";gain.gain.value=0;osc.connect(gain).connect(audioMaster);osc.start();voice={osc,gain,free};starterVoices.set(p.id,voice);}
+  const frequency=free?150+Math.min(430,(p.rpm||0)*.13):58+Math.min(220,(p.rpm||0)*.055);
+  voice.osc.frequency.setTargetAtTime(frequency,now,.03);
+  voice.gain.gain.setTargetAtTime(free?.028:.050,now,.035);
+ });
+ [...starterVoices.keys()].filter(id=>!active.has(id)).forEach(stopStarterVoice);
+}
 function syncBuzzerAudio(V){
  if(!audioEnabled||!audioContext||audioContext.state!=="running"){stopAllBuzzerVoices();return;}
  const active=new Set(),now=audioContext.currentTime;
- S().parts.filter(p=>p.type==="BUZZ"&&!p.damaged).forEach(p=>{
-  const voltage=Math.abs((V[p.id+".+"]??0)-(V[p.id+".-"]??0)),ratio=Math.max(0,Math.min(1,voltage/12));
-  p.actualVoltage=voltage;p.actualCurrent=voltage/400;p.actualPower=voltage*p.actualCurrent;
+ S().parts.filter(p=>["BUZZ","BELL"].includes(p.type)&&!p.damaged).forEach(p=>{
+  const bell=p.type==="BELL",a=bell?"A":"+",b=bell?"B":"-",resistance=bell?loadResistance(p,160):loadResistance(p,400);
+  const voltage=Math.abs((V[p.id+"."+a]??0)-(V[p.id+"."+b]??0)),ratio=Math.max(0,Math.min(1,voltage/12));
+  p.actualVoltage=voltage;p.actualCurrent=voltage/resistance;p.actualPower=voltage*p.actualCurrent;
   if(voltage<.5){stopBuzzerVoice(p.id);return;}
   active.add(p.id);let voice=buzzerVoices.get(p.id);
-  if(!voice){const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type="square";gain.gain.value=0;osc.connect(gain).connect(audioMaster);osc.start();voice={osc,gain};buzzerVoices.set(p.id,voice);}
-  voice.osc.frequency.setTargetAtTime(780+ratio*720,now,.035);
-  voice.gain.gain.setTargetAtTime(.012+.075*ratio,now,.03);
+  if(!voice||voice.bell!==bell){if(voice)stopBuzzerVoice(p.id);const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=bell?"sine":"square";gain.gain.value=0;osc.connect(gain).connect(audioMaster);osc.start();voice={osc,gain,bell};buzzerVoices.set(p.id,voice);}
+  voice.osc.frequency.setTargetAtTime(bell?430+ratio*250:780+ratio*720,now,.035);
+  voice.gain.gain.setTargetAtTime(bell?.018+.06*ratio:.012+.075*ratio,now,.03);
  });
  [...buzzerVoices.keys()].filter(id=>!active.has(id)).forEach(stopBuzzerVoice);
 }
@@ -736,7 +1001,7 @@ async function setAudioEnabled(enabled){
  const ctx=enabled?ensureAudioEngine():audioContext;
  if(enabled&&ctx){try{await ctx.resume();playUiSound("alert",.45);}catch(err){audioEnabled=false;}}
  if(enabled&&!ctx)audioEnabled=false;
- if(!audioEnabled)stopAllBuzzerVoices();
+ if(!audioEnabled){stopAllBuzzerVoices();stopAllStarterVoices();}
  updateAudioButton();
 }
 /* Browser autoplay policy: prepare buffers after the first gesture, while
@@ -796,6 +1061,32 @@ function clientToSvg(clientX, clientY){
   return{x:(clientX-r.left-panX)/zoomScale, y:(clientY-r.top-panY)/zoomScale};
 }
 function snap(){hist.push(JSON.stringify(slides));if(hist.length>60)hist.shift();future=[];}
+/* Property controls must not rebuild the Inspector while a range/number field
+   is being edited: a rebuild replaces the active DOM node and makes a slider
+   appear to stop after its first movement.  Keep the data model and solver
+   live during input, then redraw the canvas once the edit is committed. */
+function beginInspectorEdit(p,field){
+ if(!p)return;
+ if(inspectorEdit&&inspectorEdit.partId===p.id&&inspectorEdit.field===field)return;
+ snap();inspectorEdit={partId:p.id,field};
+}
+function applyInspectorEdit(p,field,change){
+ beginInspectorEdit(p,field);change();
+ /* The next animation frame also solves the circuit, but solving here makes
+    property readouts react immediately without replacing the active control. */
+ solveAll();updateStatus();updateLivePropertyPanel();
+}
+function finishInspectorEdit(p,field){
+ if(!inspectorEdit||inspectorEdit.partId!==p?.id||inspectorEdit.field!==field)return;
+ inspectorEdit=null;render();
+}
+/* Focus begins before an input event.  Treat that interval as an edit too,
+   otherwise the simulation loop can rebuild the panel between a click and the
+   first keystroke. */
+function inspectorInteractionActive(){
+ const box=$("inspector"),active=document.activeElement;
+ return !!inspectorEdit||!!(box&&active&&box.contains(active)&&active.matches?.('input, select, textarea, button, [contenteditable="true"]'));
+}
 function undo(){if(!hist.length)return;future.push(JSON.stringify(slides));
  slides=JSON.parse(hist.pop());cur=Math.min(cur,slides.length-1);sel=null;selWire=null;render();}
 function redo(){if(!future.length)return;hist.push(JSON.stringify(slides));
@@ -813,16 +1104,122 @@ function diodePoint(p,x,y=0){const rad=diodeRotation(p)*Math.PI/180,cos=Math.cos
    The terminal source of truth is shared by drawing, hit testing and netlist
    creation, so changing type cannot leave an invisible/wireable NC pin. */
 function relayType(p){return p?.relayType==="SPST"?"SPST":"SPDT";}
+const APP_FAULTS={
+ NORMAL:"ปกติ — สัญญาณสัมพันธ์ 2:1",
+ APS1_OPEN:"APS / APP1 ขาด — 0 V",
+ APS1_SHORT_GND:"APS / APP1 ช็อตลงกราวด์ — 0 V",
+ APS1_SHORT_BP:"APS / APP1 ช็อตไฟอ้างอิง — 5 V",
+ APS2_OPEN:"APS / APP2 ขาด — 0 V",
+ APS2_SHORT_GND:"APS / APP2 ช็อตลงกราวด์ — 0 V",
+ APS2_SHORT_BP:"APS / APP2 ช็อตไฟอ้างอิง — 5 V",
+ MISMATCH:"สัญญาณคู่ไม่สัมพันธ์กัน — Signal mismatch"
+};
+const appConnector=p=>p?.appConnector==="9"?"9":"6";
+const appSignalPins=p=>appConnector(p)==="9"?{one:"APP1",two:"APP2"}:{one:"APS1",two:"APS2"};
+const appFault=p=>APP_FAULTS[p?.appFault] ? p.appFault : "NORMAL";
+function appRequirements(p){
+ const base=REQ.APP||[];
+ if(appConnector(p)!=="9")return base;
+ return base.map(([a,b])=>[a==="APS1"?"APP1":a==="APS2"?"APP2":a,b]).concat([["IDLE","IVS"],["GND-I","GND-S"]]);
+}
+function sensorRequirements(p){return p?.type==="APP"?appRequirements(p):(REQ[p?.type]||[]);}
+function setAppConnector(p,variant){
+ const next=variant==="9"?"9":"6",prior=appConnector(p);if(next===prior)return;
+ const remap=next==="9"?{APS1:"APP1",APS2:"APP2"}:{APP1:"APS1",APP2:"APS2"};
+ S().wires.forEach(w=>["a","b"].forEach(end=>{const prefix=p.id+".",pin=String(w[end]||"").slice(prefix.length);if(String(w[end]||"").startsWith(prefix)&&remap[pin])w[end]=prefix+remap[pin];}));
+ if(next==="6")S().wires=S().wires.filter(w=>!["IDLE","GND-I","NC"].some(pin=>w.a===p.id+"."+pin||w.b===p.id+"."+pin));
+ p.appConnector=next;p.limpMode=false;p.appDtc="";p.appDtcAlerted=false;
+}
 function pinsFor(p){
  const pins=DEF[p.type]?.pins||[];
+ if(p.type==="APP")return appConnector(p)==="9"?APP_PINS_9:APP_PINS_6;
  return p.type==="RELAY"&&relayType(p)==="SPST"?pins.filter(pin=>pin[0]!=="NC"):pins;
 }
 function componentName(p){
+ const custom=String(p?.label||"").trim();if(custom)return custom;
  if(p.type==="RELAY")return "รีเลย์";
  return DEF[p.type]?.nm||p.type;
 }
+const componentEnabled=p=>!!p&&p.disabled!==true;
+const boundedSetting=(p,key,min,max,fallback)=>Math.max(min,Math.min(max,Number(p?.[key])||fallback));
+const diodeForwardResistance=p=>boundedSetting(p,"forwardR",.5,100,8);
+const ledModelResistance=p=>boundedSetting(p,"ledModelR",20,2000,LED_MODEL_R);
+const loadResistance=(p,fallback)=>boundedSetting(p,"loadR",1,100000,fallback);
+const relayCoilResistance=p=>boundedSetting(p,"coilR",20,5000,400);
+const transformerPrimaryResistance=p=>boundedSetting(p,"primaryR",.1,10000,15);
+const transformerSecondaryResistance=p=>boundedSetting(p,"secondaryR",.1,10000,6);
+const ecuReferenceVoltage=p=>boundedSetting(p,"ecuVref",1,12,VREF);
+const ecuSupplyVoltage=p=>boundedSetting(p,"ecuSupply",6,60,VBATT);
+const groundPotential=p=>boundedSetting(p,"groundPotential",-24,24,0);
+const channelResistance=p=>boundedSetting(p,"channelR",.05,100000,20);
+const baseThreshold=p=>boundedSetting(p,"baseThreshold",.1,5,.65);
+const gateThreshold=p=>boundedSetting(p,"gateThreshold",.1,20,3);
+const triacTriggerVoltage=p=>boundedSetting(p,"triggerVoltage",.1,20,1.2);
+const mafIatTemp=p=>boundedSetting(p,"iatTemp",-40,120,25);
+const escAttr=value=>String(value??"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+/* One schema drives the Properties panel.  Every placed component receives
+   the common name/enable controls; electrical components add only the fields
+   that their model actually consumes. */
+const UNIVERSAL_PROPERTY_SCHEMA={
+ ECU:[{key:"ecuVref",label:"แรงดันอ้างอิง ECU",min:1,max:12,step:.1,unit:"V",fallback:VREF},{key:"ecuSupply",label:"ไฟเลี้ยง ECU",min:6,max:60,step:.1,unit:"V",fallback:VBATT}],
+ GND:[{key:"groundPotential",label:"ศักย์กราวด์อ้างอิง",min:-24,max:24,step:.1,unit:"V",fallback:0}],
+ AC:[{key:"acFrequency",label:"ความถี่ AC",min:1,max:400,step:1,unit:"Hz",fallback:50}],
+ DIODE:[{key:"forwardR",label:"ความต้านทานขณะนำกระแส",min:.5,max:100,step:.1,unit:"Ω",fallback:8}],
+ LEDp:[{key:"ledModelR",label:"ความต้านทานจำลอง LED",min:20,max:2000,step:1,unit:"Ω",fallback:LED_MODEL_R}],
+ BUZZ:[{key:"loadR",label:"ความต้านทานบัซเซอร์",min:1,max:100000,step:1,unit:"Ω",fallback:400}],
+ BELL:[{key:"loadR",label:"ความต้านทานกระดิ่ง",min:1,max:100000,step:1,unit:"Ω",fallback:160}],
+ FAN:[{key:"loadR",label:"ความต้านทานมอเตอร์พัดลม",min:1,max:100000,step:1,unit:"Ω",fallback:80}],
+ RELAY:[{key:"coilR",label:"ความต้านทานคอยล์",min:20,max:5000,step:1,unit:"Ω",fallback:400}],
+ MAF:[{key:"iatTemp",label:"อุณหภูมิ IAT ใน MAF",min:-40,max:120,step:1,unit:"°C",fallback:25}],
+ XFMR:[{key:"primaryR",label:"R ขดปฐมภูมิ",min:.1,max:10000,step:.1,unit:"Ω",fallback:15},{key:"secondaryR",label:"R ขดทุติยภูมิ",min:.1,max:10000,step:.1,unit:"Ω",fallback:6}],
+ NPN:[{key:"baseThreshold",label:"แรงดันเปิด B-E",min:.1,max:5,step:.05,unit:"V",fallback:.65},{key:"channelR",label:"R C-E เมื่อเปิด",min:.05,max:100000,step:.05,unit:"Ω",fallback:20}],
+ NMOS:[{key:"gateThreshold",label:"แรงดันเปิด G-S",min:.1,max:20,step:.1,unit:"V",fallback:3},{key:"channelR",label:"R D-S เมื่อเปิด",min:.05,max:100000,step:.05,unit:"Ω",fallback:2}],
+ TRIAC:[{key:"triggerVoltage",label:"แรงดันทริกเกอร์ Gate",min:.1,max:20,step:.1,unit:"V",fallback:1.2},{key:"channelR",label:"R A1-A2 เมื่อเปิด",min:.05,max:100000,step:.05,unit:"Ω",fallback:2}]
+};
+function universalPropertyDefs(p){
+ const common=[{key:"label",label:"ชื่อที่แสดงบน Canvas",kind:"text",placeholder:DEF[p.type]?.nm||p.type},{key:"enabled",label:"การทำงานในวงจร",kind:"select",options:[["on","เปิดใช้งาน"],["off","ปิดชิ้นส่วนนี้"]]}];
+ /* General teaching controls use whole practical units (%, °C, rpm, V).
+    step=any produced long binary-float strings in the slider and input. */
+ if(CTRL[p.type]&&p.type!=="RES"){const [label,min,max,fallback,unit]=CTRL[p.type];common.push({key:"value",label,min,max,step:1,unit,fallback,kind:"range"});}
+ return common.concat(UNIVERSAL_PROPERTY_SCHEMA[p.type]||[]);
+}
+function universalPropertyValue(p,def){
+ if(def.key==="label")return p.label||"";
+ if(def.key==="enabled")return componentEnabled(p)?"on":"off";
+ if(def.key==="value"){const value=Number.isFinite(Number(p.val))?Number(p.val):def.fallback;return Number(def.step)===1?Math.round(value):value;}
+ return boundedSetting(p,def.key,def.min,def.max,def.fallback);
+}
+function renderUniversalPropertyEditor(p){
+ const fields=universalPropertyDefs(p);if(!fields.length)return "";
+ const row=def=>{const value=universalPropertyValue(p,def),key=escAttr(def.key);
+  if(def.kind==="text")return `<div class="fld"><label>${def.label}</label><input class="universal-prop" data-key="${key}" type="text" maxlength="32" placeholder="${escAttr(def.placeholder||"")}" value="${escAttr(value)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px"><b></b></div>`;
+  if(def.kind==="select")return `<div class="fld"><label>${def.label}</label><select class="universal-prop" data-key="${key}">${def.options.map(([id,text])=>`<option value="${id}" ${value===id?"selected":""}>${text}</option>`).join("")}</select><b></b></div>`;
+  if(def.kind==="range")return `<div class="fld"><label>${def.label}</label><input class="universal-prop" data-key="${key}" type="range" min="${def.min}" max="${def.max}" step="${def.step}" value="${value}"><b class="universal-output" data-output="${key}" style="width:66px;text-align:right;font-family:Consolas">${value} ${def.unit||""}</b></div><div class="fld"><label>ค่าตรง ๆ</label><input class="universal-prop" data-key="${key}" type="number" min="${def.min}" max="${def.max}" step="${def.step}" value="${value}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b style="width:auto;color:#6b7784">${def.unit||""}</b></div>`;
+  return `<div class="fld"><label>${def.label}</label><input class="universal-prop" data-key="${key}" type="number" min="${def.min}" max="${def.max}" step="${def.step??"any"}" value="${value}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>${def.unit||""}</b></div>`;
+ };
+ return `<div class="insp universal-properties" style="padding:8px;margin-top:9px"><div class="t">การตั้งค่าอุปกรณ์</div>${fields.map(row).join("")}</div>`;
+}
+function bindUniversalPropertyEditor(p){
+ const box=$("inspector"),defs=universalPropertyDefs(p),byKey=Object.fromEntries(defs.map(def=>[def.key,def]));
+ const same=(a,b)=>typeof a==="number"&&typeof b==="number"?Math.abs(a-b)<1e-9:a===b;
+ const sync=(key,value)=>{const def=byKey[key];box.querySelectorAll(`.universal-prop[data-key="${key}"]`).forEach(el=>{if(el.value!==String(value))el.value=value;});box.querySelectorAll(`.universal-output[data-output="${key}"]`).forEach(el=>el.textContent=`${value} ${def.unit||""}`);};
+ const write=(def,value)=>{if(def.key==="label")p.label=value;else if(def.key==="enabled"){p.disabled=value!=="on";if(p.disabled){p.lit=false;p.conducting=false;p.energized=false;p.cranking=false;p.startCommanded=false;p.motorCircuitOn=false;p.motorSpinning=false;p.solenoidEngaged=false;p.bendixPosition=0;}}else if(def.key==="value")p.val=value;else p[def.key]=value;};
+ box.querySelectorAll(".universal-prop").forEach(el=>{const def=byKey[el.dataset.key];if(!def)return;const field=`universal:${def.key}`;
+  const commit=finish=>{let value;
+   if(def.kind==="text")value=el.value.trim().slice(0,32);
+   else if(def.kind==="select")value=el.value;
+   else {const raw=el.value.trim(),parsed=Number(raw);if(raw===""||!Number.isFinite(parsed)){if(finish)sync(def.key,universalPropertyValue(p,def));return;}value=Math.max(def.min,Math.min(def.max,parsed));if(def.kind==="range"&&Number(def.step)===1)value=Math.round(value);}
+   /* Compare a controller value with its stored value so an old fractional
+      value is rewritten as an integer on the next adjustment. */
+   const prior=def.key==="value"?Number(p.val):universalPropertyValue(p,def);if(!same(value,prior)||inspectorEdit)applyInspectorEdit(p,field,()=>write(def,value));
+   sync(def.key,universalPropertyValue(p,def));if(finish)finishInspectorEdit(p,field);
+  };
+  if(def.kind==="select")el.addEventListener("change",()=>commit(true));
+  else {el.addEventListener("input",()=>commit(false));el.addEventListener("change",()=>commit(true));el.addEventListener("blur",()=>finishInspectorEdit(p,field));}
+ });
+}
 function hasConfigurableSettings(p){
- return !!(CTRL[p.type]||["BATT","BULB","RELAY","RES","LEDp","DIODE"].includes(p.type));
+ return !!DEF[p?.type];
 }
 /* Every non-axial component uses terminals directly beneath its SVG asset.
    These shared coordinates are used both by the renderer and the netlist. */
@@ -832,14 +1229,34 @@ function realisticTerminal(p,index){
     31-unit pitch keep SIG-A/SIG-B labels separate while the same coordinates
     remain the source of truth for wires, hit tests and the circuit netlist. */
  if(p.type==="ECU"){
-  return{x:d.w/2+(index-3.5)*31,y:112};
+  const count=pinsFor(p).length,spacing=count>8?37:31;
+  return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};
  }
+ if(p.type==="IGN")return{x:d.w/2+(index-1.5)*40,y:112};
+ if(p.type==="STARTER")return{x:d.w/2+(index-1)*47,y:112};
+ if(p.type==="MAF")return{x:d.w/2+(index-2)*48,y:112};
+ if(p.type==="O2")return{x:d.w/2+(index-1.5)*50,y:112};
+ if(p.type==="APP"){const count=pinsFor(p).length,spacing=count===9?45:52;return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};}
  const count=pinsFor(p).length,spacing=count===1?0:Math.min(32,120/(count-1));
  return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};
 }
 function otherEnd(pid){const w=S().wires.find(w=>w.a===pid||w.b===pid);
  if(!w)return null;return w.a===pid?w.b:w.a;}
+/* A grid node is a first-class circuit node, not a visual-only coordinate.
+   Multiple wire ends may use the same GRID.x.y id; the nodal solver already
+   unions wire endpoints, so this naturally creates an electrical junction. */
+const GRID_STEP=16;
+const isGridNode=pid=>typeof pid==="string"&&/^GRID\.-?\d+\.-?\d+$/.test(pid);
+function gridNodePos(pid){
+ const m=String(pid||"").match(/^GRID\.(-?\d+)\.(-?\d+)$/);
+ return m?{x:Number(m[1]),y:Number(m[2])}:null;
+}
+function snapGridPoint(point){
+ return{x:Math.round(point.x/GRID_STEP)*GRID_STEP,y:Math.round(point.y/GRID_STEP)*GRID_STEP};
+}
+function gridNodeId(point){const p=snapGridPoint(point);return `GRID.${p.x}.${p.y}`;}
 function pinPos(pid){
+ if(isGridNode(pid))return gridNodePos(pid);
  if(pid==="DMM.RED")return dmmJackPos(jackRed);
  if(pid==="DMM.BLACK")return dmmJackPos("COM");
  if(pid.startsWith("SCOPE.")){const[,ch,rb]=pid.split(".");return scopeJackPos(ch,rb);}
@@ -868,7 +1285,8 @@ function nearestConnectablePin(point){
 const NS="http://www.w3.org/2000/svg";
 function mk(t,a,x){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);
  if(x!==undefined)e.textContent=x;return e;}
-const ECU_PIN_SENSOR={"SIG-A":"ECT","SIG-B":"TPS","SIG-C":"CKP","SIG-D":"IAT","SIG-E":"MAP"};
+const ECU_PIN_SENSOR={"SIG-A":"ECT","SIG-B":"TPS","SIG-C":"CKP","SIG-D":"IAT","SIG-E":"MAP",
+ "MAF":"MAF","O2":"O2","CMP":"CMP","KNOCK":"KNOCK","APP1":"APP","APP2":"APP","IVS":"IVS"};
 /* foreignObject lets ECU labels use the same centred flex-column layout as
    the rest of the HTML UI while staying attached to the SVG terminal. */
 function appendEcuPinLabel(parent,terminal,pinName){
@@ -885,6 +1303,35 @@ function appendRelayPinLabel(parent,terminal,pinName){
  const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="relay-pin-label";
  const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
  const number=document.createElement("span");number.className="terminal-number";number.textContent=RELAY_PIN_NUMBER[pinName]||"";label.appendChild(number);
+ box.appendChild(label);parent.appendChild(box);
+}
+const STANDARD_TERMINAL_LABELS={
+ IGN:{ACC:"ACC / 1",IGN:"IG / 15",ST:"ST / 50",BAT:"B / 30"},
+ STARTER:{S:"Terminal 50",B:"Terminal 30",GND:"Body"}
+};
+function appendStandardPinLabel(parent,terminal,pinName,type){
+ const second=STANDARD_TERMINAL_LABELS[type]?.[pinName]||"",width=type==="STARTER"?52:40;
+ const box=mk("foreignObject",{class:"standard-pin-label-box",x:terminal.x-width/2,y:terminal.y+13,width,height:31});
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="standard-pin-label";
+ const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const number=document.createElement("span");number.className="terminal-number";number.textContent=second;label.appendChild(number);
+ box.appendChild(label);parent.appendChild(box);
+}
+const SENSOR_TERMINAL_DETAILS={
+ MAF:{"B+":"12V","GND":"Ground","VREF":"5V","MAF":"Flow Signal","IAT":"Temp Signal"},
+ O2:{"Heater+":"Heater +","Heater-":"Heater −","Signal+":"Signal +","Signal-":"Signal −"},
+ CMP_HALL:{"B+":"12V","GND":"Ground","SIG":"Hall Signal"},
+ CMP_VR:{"S+":"Coil +","S-":"Coil −"},
+ KNOCK:{"SIG":"Signal","GND":"Ground"},
+ APP:{"VREF1":"5V Main","GND1":"E1","APS1":"Signal 1","VREF2":"5V Sub","GND2":"E2","APS2":"Signal 2",
+      "APP1":"Signal 1","APP2":"Signal 2","IDLE":"IVS Signal","GND-I":"IVS GND","NC":"Shield"}
+};
+function appendSensorPinLabel(parent,terminal,pinName,type){
+ const detail=SENSOR_TERMINAL_DETAILS[type]?.[pinName]||"",width=type==="APP"?42:pinName.length>5?62:48;
+ const box=mk("foreignObject",{class:"sensor-pin-label-box",x:terminal.x-width/2,y:terminal.y+13,width,height:31});
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="sensor-pin-label"+(type==="APP"?" app-sensor-pin-label":"");
+ const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const sub=document.createElement("span");sub.className="sensor-terminal-detail";sub.textContent=detail;label.appendChild(sub);
  box.appendChild(label);parent.appendChild(box);
 }
 const instrDmm=mk("g",{id:"instrDmm"});instrL.appendChild(instrDmm);
@@ -906,15 +1353,39 @@ function partIcon(p){
     G.appendChild(mk("path",{d:"M2 10 v10 M4 10 v10",stroke:"#d3b56b","stroke-width":1.5}));
     G.appendChild(mk("rect",{x:20,y:12,width:8,height:6,rx:2,fill:t==="ECT"?"#c9820a":"#3d9bc1"}));
     if(t==="ECT")G.appendChild(mk("path",{d:"M12 10 v9 M9 17 a3 3 0 1 0 6 0",fill:"none",stroke:"#e74c3c","stroke-width":1.4}));
+  } else if(t==="APP"){
+    const press=Math.max(0,Math.min(100,Number(p.val)||0)),travel=press*.065;
+    /* Pedal arm + sensor housing: an intentionally physical silhouette rather
+       than a card, with the arm moving as the Property-panel slider changes. */
+    G.appendChild(mk("path",{d:"M4 25 L10 25 L17 7 L21 9 L15 23 L26 23 L26 28 L11 28 z",fill:"#778490",stroke:"#25313c","stroke-width":1.25}));
+    G.appendChild(mk("rect",{x:17,y:7,width:10,height:13,rx:2,fill:"#334958",stroke:"#16232d","stroke-width":1.1}));
+    G.appendChild(mk("circle",{cx:22,cy:13.5,r:3.3,fill:"#7fc3df",stroke:"#d8f5ff","stroke-width":.7}));
+    G.appendChild(mk("line",{x1:10,y1:24,x2:12+travel,y2:21-travel*.34,stroke:"#ffd166","stroke-width":2.2,"stroke-linecap":"round"}));
+    G.appendChild(mk("rect",{x:2,y:26,width:11,height:3,rx:1.2,fill:"#252d35"}));
+    [0,1,2].forEach(i=>G.appendChild(mk("line",{x1:4+i*3,y1:26,x2:4+i*3,y2:29,stroke:"#aeb9c3","stroke-width":.55})));
+    G.appendChild(mk("text",{x:22,y:17,"text-anchor":"middle","font-size":4.8,"font-weight":700,fill:"#e6f4fb"},appConnector(p)==="9"?"APP 9":"APP 6"));
   } else if(t==="TPS"||t==="MAP"){
     G.appendChild(mk("rect",{x:4,y:5,width:22,height:20,rx:5,fill:t==="TPS"?"#343844":"#2d5166",stroke:"#17202a","stroke-width":1.2}));
     G.appendChild(mk("rect",{x:1,y:11,width:7,height:8,rx:1,fill:"#c6cbd2"}));
     G.appendChild(mk("circle",{cx:18,cy:15,r:6,fill:"#71839a",stroke:"#b8c6d4"}));
     G.appendChild(mk("line",{x1:18,y1:15,x2:t==="TPS"?22:18,y2:t==="TPS"?10:8,stroke:"#f0c36b","stroke-width":1.8}));
-  } else if(t==="CKP_HALL"||t==="CKP_VR"){
+  } else if(t==="CKP_HALL"||t==="CKP_VR"||t==="CMP_HALL"||t==="CMP_VR"){
     G.appendChild(mk("path",{d:"M3 8 h13 l9 7 -9 7 H3 z",fill:"#414d55",stroke:"#121820","stroke-width":1.2}));
-    G.appendChild(mk("rect",{x:18,y:11,width:10,height:8,rx:3,fill:t==="CKP_HALL"?"#4e9d72":"#c9820a"}));
+    G.appendChild(mk("rect",{x:18,y:11,width:10,height:8,rx:3,fill:t.endsWith("HALL")?"#4e9d72":"#c9820a"}));
     G.appendChild(mk("path",{d:"M6 8 v14 M9 8 v14",stroke:"#d5b96a","stroke-width":1.3}));
+  } else if(t==="MAF"){
+    G.appendChild(mk("path",{d:"M3 8 h17 l7 7 -7 7 H3 z",fill:"#29576e",stroke:"#152d3b","stroke-width":1.2}));
+    G.appendChild(mk("circle",{cx:18,cy:15,r:5,fill:"#78b8d5",stroke:"#d8f4ff","stroke-width":.7}));
+    [7,11,15,19].forEach(y=>G.appendChild(mk("line",{x1:5,y1:y,x2:12,y2:y,stroke:"#bfe6f2","stroke-width":.9,"stroke-linecap":"round"})));
+    G.appendChild(mk("text",{x:18,y:17,"text-anchor":"middle","font-size":5.4,"font-weight":700,fill:"#163141"},"MAF"));
+  } else if(t==="O2"){
+    G.appendChild(mk("path",{d:"M13 3 h5 v6 l4 4 v10 l-4 4 h-5 l-4-4 V13 l4-4 z",fill:"#b8bdc3",stroke:"#4d5963","stroke-width":1.1}));
+    G.appendChild(mk("path",{d:"M15.5 4 v20 M11 13 h9",stroke:"#65727c","stroke-width":1}));
+    G.appendChild(mk("path",{d:"M8 6 q-4 4 0 8",fill:"none",stroke:"#d48129","stroke-width":1.3}));
+  } else if(t==="KNOCK"){
+    G.appendChild(mk("path",{d:"M5 10 h20 l-3 12 H8 z",fill:"#777f89",stroke:"#2c3540","stroke-width":1.2}));
+    G.appendChild(mk("circle",{cx:15,cy:16,r:4,fill:"#2f3942",stroke:"#b8c1ca","stroke-width":1}));
+    G.appendChild(mk("path",{d:"M15 5 v4 M10 6 l2 3 M20 6 l-2 3",stroke:"#e5b94e","stroke-width":1.3,"stroke-linecap":"round"}));
   } else if(t==="RES"){
     const bands=resistorBandSet(p),burning=!!p.damaged||!!p.burned;
     G.appendChild(mk("rect",{x:2,y:10,width:2,height:10,fill:"#c9a06a"}));
@@ -962,27 +1433,27 @@ function partIcon(p){
     G.appendChild(mk("text",{x:14,y:17.5,"text-anchor":"middle","font-size":6.2,fill:"#e6edf3","font-weight":700},"1N4007"));
     if(p.conducting)G.appendChild(mk("circle",{cx:9,cy:8,r:2,fill:"#7ee787"}));
   } else if(t==="LEDp"){
-    const spec=ledSpec(p),brightness=broken?0:Math.max(0,Math.min(1,(Number(p.actualCurrent)||0)/.020)),fill=broken?"#1c2229":brightness>.001?spec.color:spec.off;
-    if(brightness>.001){G.appendChild(mk("circle",{cx:16,cy:16,r:15+brightness*11,fill:spec.color,opacity:.05+.17*brightness,"pointer-events":"none"}));
-      G.appendChild(mk("circle",{cx:16,cy:16,r:10+brightness*6,fill:spec.color,opacity:.10+.18*brightness,"pointer-events":"none"}));}
-    G.appendChild(mk("path",{d:"M8 22 L8 10 L22 16 Z",fill,stroke:broken?"#0b0d10":"none","stroke-width":broken?1.1:0}));
-    G.appendChild(mk("line",{x1:22,y1:8,x2:22,y2:24,stroke:fill,"stroke-width":2.5}));
-    if(brightness>.001){G.appendChild(mk("line",{x1:24,y1:6,x2:28,y2:2,stroke:"#ffd166","stroke-width":1.2+brightness*1.2,opacity:brightness}));
-      G.appendChild(mk("line",{x1:26,y1:9,x2:30,y2:7,stroke:"#ffd166","stroke-width":1.2+brightness*1.2,opacity:brightness}));}
+    const spec=ledSpec(p),voltage=Number(p.actualVoltage)||0,brightness=broken||voltage<spec.vf*.65?0:Math.max(0,Math.min(1,(Number(p.actualCurrent)||0)/.020)),fill=broken?"#1c2229":brightness>.001?spec.color:spec.off;
+    G.appendChild(mk("circle",{class:"led-glow-outer",cx:16,cy:16,r:15+brightness*11,fill:spec.color,opacity:brightness>.001?.05+.17*brightness:0,"pointer-events":"none"}));
+    G.appendChild(mk("circle",{class:"led-glow-inner",cx:16,cy:16,r:10+brightness*6,fill:spec.color,opacity:brightness>.001?.10+.18*brightness:0,"pointer-events":"none"}));
+    G.appendChild(mk("path",{class:"led-body",d:"M8 22 L8 10 L22 16 Z",fill,stroke:broken?"#0b0d10":"none","stroke-width":broken?1.1:0}));
+    G.appendChild(mk("line",{class:"led-cathode",x1:22,y1:8,x2:22,y2:24,stroke:fill,"stroke-width":2.5}));
+    G.appendChild(mk("line",{class:"led-ray led-ray-one",x1:24,y1:6,x2:28,y2:2,stroke:"#ffd166","stroke-width":1.2+brightness*1.2,opacity:brightness}));
+    G.appendChild(mk("line",{class:"led-ray led-ray-two",x1:26,y1:9,x2:30,y2:7,stroke:"#ffd166","stroke-width":1.2+brightness*1.2,opacity:brightness}));
     if(broken){G.appendChild(mk("line",{x1:5,y1:5,x2:27,y2:27,stroke:"#ff6b5b","stroke-width":2.4}));
       G.appendChild(mk("line",{x1:27,y1:5,x2:5,y2:27,stroke:"#ff6b5b","stroke-width":2.4}));}
   } else if(t==="BULB"){
     const ratio=broken?0:Math.max(0,Math.min(1,(Number(p.actualVoltage)||0)/Math.max(1,bulbRatedVoltage(p)))),powerRatio=broken?0:Math.max(0,Math.min(1,(Number(p.actualPower)||0)/Math.max(.1,bulbRatedPower(p))));
     const glow=Math.max(ratio*.65,powerRatio),filament=glow<.12?"#8a8468":glow<.45?"#ee6c32":glow<.8?"#ffb21c":"#fff4c2";
-    if(glow>.02)G.appendChild(mk("circle",{cx:15,cy:12,r:10+glow*11,fill:filament,opacity:.06+.17*glow,"pointer-events":"none"}));
-    G.appendChild(mk("circle",{cx:15,cy:12,r:9,fill:broken?"#252a30":glow>.02?filament:"#e9e6d8",
+    G.appendChild(mk("circle",{class:"bulb-glow",cx:15,cy:12,r:10+glow*11,fill:filament,opacity:glow>.02?.06+.17*glow:0,"pointer-events":"none"}));
+    G.appendChild(mk("circle",{class:"bulb-glass",cx:15,cy:12,r:9,fill:broken?"#252a30":glow>.02?filament:"#e9e6d8",
       stroke:broken?"#111820":"#b9b190","stroke-width":1.5}));
-    G.appendChild(mk("path",{d:"M11 12 L14 8 M14 8 L13 14 M13 14 L17 10 M17 10 L16 16",
+    G.appendChild(mk("path",{class:"bulb-filament",d:"M11 12 L14 8 M14 8 L13 14 M13 14 L17 10 M17 10 L16 16",
       fill:"none",stroke:broken?"#77808a":filament,"stroke-width":1+glow}));
     G.appendChild(mk("rect",{x:11,y:20,width:8,height:6,fill:"#b0b0b0"}));
     for(let i=0;i<3;i++)G.appendChild(mk("line",{x1:11,y1:21+i*1.6,x2:19,y2:21+i*1.6,
       stroke:"#7a7a7a","stroke-width":.8}));
-    if(lit)G.appendChild(mk("circle",{cx:15,cy:12,r:13,fill:"#ffef9e",opacity:.35}));
+    G.appendChild(mk("circle",{class:"bulb-lit-glow",cx:15,cy:12,r:13,fill:"#ffef9e",opacity:lit?.35:0,"pointer-events":"none"}));
     if(broken){G.appendChild(mk("path",{d:"M11 5 L16 11 L13 15 L19 20",fill:"none",stroke:"#c7cdd6","stroke-width":1.3}));
       G.appendChild(mk("line",{x1:5,y1:4,x2:26,y2:25,stroke:"#ff6b5b","stroke-width":2.2}));}
   } else if(t==="BUZZ"){
@@ -1009,6 +1480,30 @@ function partIcon(p){
     [0,90,180,270].forEach(a=>{const rad=(a+(lit?20:0))*Math.PI/180;
       G.appendChild(mk("ellipse",{cx:15+Math.cos(rad)*7,cy:15+Math.sin(rad)*7,rx:6,ry:3,
         fill:"#8aa5c7",transform:`rotate(${a} ${15+Math.cos(rad)*7} ${15+Math.sin(rad)*7})`}));});
+  } else if(t==="IGN"){
+    const stage=ignitionStage(p),angle={LOCK:-135,ACC:-45,ON:10,START:58}[stage]??-135;
+    G.appendChild(mk("circle",{cx:15,cy:15,r:13,fill:"#303841",stroke:"#151b21","stroke-width":1.5}));
+    G.appendChild(mk("circle",{cx:15,cy:15,r:9.5,fill:"#c6cbd0",stroke:"#707a84","stroke-width":1.1}));
+    G.appendChild(mk("circle",{cx:15,cy:15,r:3.6,fill:"#222a31",stroke:"#e8edf2","stroke-width":.7}));
+    [-135,-45,10,58].forEach((a,i)=>{const r=a*Math.PI/180;G.appendChild(mk("line",{x1:15+Math.cos(r)*10.8,y1:15+Math.sin(r)*10.8,x2:15+Math.cos(r)*13,y2:15+Math.sin(r)*13,stroke:i===IGNITION_STAGES.indexOf(stage)?"#ffd166":"#5e6872","stroke-width":1.25}));});
+    const r=angle*Math.PI/180;G.appendChild(mk("line",{x1:15,y1:15,x2:15+Math.cos(r)*8.1,y2:15+Math.sin(r)*8.1,stroke:"#b42318","stroke-width":2.1,"stroke-linecap":"round"}));
+    G.appendChild(mk("path",{d:"M15 15 l8 7 l-2 2 l-3-2 l-1 5 h-2 l1-6 z",fill:"#b8c1c9",stroke:"#59646e","stroke-width":.6}));
+    G.appendChild(mk("text",{x:15,y:30,"text-anchor":"middle","font-size":4.6,"font-weight":700,fill:stage==="LOCK"?"#aeb7c0":"#7ee787"},stage));
+  } else if(t==="STARTER"){
+    const engaged=!!p.solenoidEngaged,spinning=!!p.motorSpinning,mode=starterFault(p),faultColor=mode==="JAMMED"?"#c0392b":mode==="DEAD"?"#6b7280":mode==="FREE_SPIN"?"#65b9ff":"#7ee787";
+    G.appendChild(mk("rect",{x:2,y:10,width:18,height:12,rx:6,fill:spinning?"#536b7d":"#46535e",stroke:"#1e2932","stroke-width":1.1}));
+    const rotor=mk("g",{class:"starter-rotor","data-part-id":p.id,transform:"rotate(0 4 16)"});
+    rotor.appendChild(mk("circle",{cx:4,cy:16,r:5.4,fill:"#73818b",stroke:"#26313a","stroke-width":1.1}));
+    rotor.appendChild(mk("circle",{cx:4,cy:16,r:2.2,fill:"#2a333b"}));
+    [0,120,240].forEach(a=>{const rad=a*Math.PI/180;rotor.appendChild(mk("line",{x1:4+Math.cos(rad)*4.4,y1:16+Math.sin(rad)*4.4,x2:4+Math.cos(rad)*7.5,y2:16+Math.sin(rad)*7.5,stroke:spinning?faultColor:"#45515b","stroke-width":1.2,"stroke-linecap":"round"}));});G.appendChild(rotor);
+    G.appendChild(mk("rect",{class:"starter-solenoid","data-part-id":p.id,x:18,y:5,width:8,height:9,rx:2,fill:engaged?"#d49117":"#a8792d",stroke:"#533b16","stroke-width":1}));
+    const bendix=mk("g",{class:"starter-bendix","data-part-id":p.id,transform:`translate(${(Number(p.bendixPosition)||0)*5} 0)`});
+    bendix.appendChild(mk("line",{x1:20,y1:13,x2:28,y2:16,stroke:engaged?faultColor:"#2b333b","stroke-width":2.1,"stroke-linecap":"round"}));
+    bendix.appendChild(mk("rect",{x:24,y:8,width:5,height:15,rx:2,fill:"#59646e",stroke:"#27323b","stroke-width":1}));
+    bendix.appendChild(mk("circle",{cx:29,cy:16,r:3.4,fill:"#8f9aa4",stroke:"#26313a","stroke-width":1}));
+    for(let a=0;a<360;a+=60){const rad=a*Math.PI/180;bendix.appendChild(mk("line",{x1:29+Math.cos(rad)*2.5,y1:16+Math.sin(rad)*2.5,x2:29+Math.cos(rad)*4.2,y2:16+Math.sin(rad)*4.2,stroke:"#29353d","stroke-width":.9}));}
+    G.appendChild(bendix);
+    G.appendChild(mk("text",{class:"starter-mode-mark","data-part-id":p.id,x:16,y:29,"text-anchor":"middle","font-size":4.3,"font-weight":700,fill:faultColor},mode==="NORMAL"?"START":mode==="CLICK_ONLY"?"CLICK":mode==="FREE_SPIN"?"FREE":mode==="JAMMED"?"JAM":"OPEN"));
   } else if(t==="RELAY"){
     G.appendChild(mk("rect",{x:3,y:4,width:24,height:22,rx:3,fill:"#3a4550",stroke:"#1b2129"}));
     for(let i=0;i<4;i++)G.appendChild(mk("path",{d:`M ${7} ${8+i*3.5} h 8`,fill:"none",
@@ -1086,7 +1581,44 @@ function partIcon(p){
 }
 function wireState(w,V){
   const a=V[w.a],b=V[w.b],av=Number.isFinite(a)?a:0,bv=Number.isFinite(b)?b:0;
-  return {live:running&&((a!==undefined&&Math.abs(av)>.25)||(b!==undefined&&Math.abs(bv)>.25)),reverse:av<bv};
+  /* Voltage alone only means that a wire is energised.  Showing moving
+     particles in that case made an open circuit look as though current was
+     flowing.  The animation now requires a solved branch current. */
+  const current=Math.max(0,Number(PIN_I[w.a])||0,Number(PIN_I[w.b])||0);
+  return {live:running&&current>1e-6,reverse:av<bv};
+}
+const WIRE_COLORS=["#e7bd3f","#e05252","#2fbf5f","#3578e5","#4b5563"];
+function defaultWireColor(a,b){
+ const isRed=s=>s==="DMM.RED"||/^SCOPE\..+\.RED$/.test(s);
+ const isBlack=s=>s==="DMM.BLACK"||/^SCOPE\..+\.BLACK$/.test(s);
+ return isRed(a)||isRed(b)?"#d32f2f":isBlack(a)||isBlack(b)?"#333":WIRE_COLORS[0];
+}
+function nextWireColor(w){
+ const now=w.c||WIRE_COLORS[0],at=WIRE_COLORS.indexOf(now);
+ return WIRE_COLORS[(at+1+WIRE_COLORS.length)%WIRE_COLORS.length];
+}
+function wireEndpointPoint(w,end){
+ if(wireDrag&&wireDrag.wire===w&&wireDrag.end===end)return wireDrag.point;
+ return pinPos(w[end]);
+}
+function wireHandle(w,index,end,point,color){
+ const handle=mk("g",{class:"wire-handle","data-wire-handle":`${index}:${end}`,transform:`translate(${point.x},${point.y})`,role:"button",tabindex:"0","aria-label":`ลากปลายสาย ${end==="a"?"ต้น":"ปลาย"}`});
+ handle.appendChild(mk("circle",{class:"wire-handle-outer",cx:0,cy:0,r:6.3}));
+ handle.appendChild(mk("circle",{class:"wire-handle-inner",cx:0,cy:0,r:2.2}));
+ handle.appendChild(mk("title",{},"ลากปลายสายเพื่อย้ายขั้วหรือปักลงจุดกริด"));
+ handle.addEventListener("pointerdown",event=>startWireEndpointDrag(event,w,index,end));
+ handle.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();sel=null;selWire=w;render();}});
+ return handle;
+}
+function wireColorButton(x,y,w){
+ const color=w.c||WIRE_COLORS[0],button=mk("g",{class:"wire-menu-color no-drag",transform:`translate(${x},${y})`,role:"button",tabindex:"0","aria-label":"เปลี่ยนสีสายไฟ"});
+ button.appendChild(mk("circle",{class:"wire-menu-color-bg",cx:0,cy:0,r:10,fill:color,stroke:"#26323d","stroke-width":1.5}));
+ button.appendChild(mk("path",{d:"M-4 1 C-1-5 4-4 4-1 C4 3 0 5-3 4",fill:"none",stroke:"#fff", "stroke-width":1.8,"stroke-linecap":"round"}));
+ button.appendChild(mk("title",{},"เปลี่ยนสีสายไฟ"));
+ const activate=event=>{event.preventDefault();event.stopPropagation();snap();w.c=nextWireColor(w);render();};
+ button.addEventListener("pointerdown",event=>event.stopPropagation());button.addEventListener("pointerup",activate);
+ button.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" ")activate(event);});
+ return button;
 }
 /* ป้ายกระแสบนสายจัมเปอร์ (mA/A) ให้แผงวงจรดูเหมือนของจริงตามภาพตัวอย่างที่แนบมา */
 function fmtAmpsLabel(i){
@@ -1131,9 +1663,9 @@ function batteryRechargeButton(p){
    (K).  Its local origin is the centre of the body, so rotation keeps both
    lead-end connection points exactly aligned with the drawing. */
 function realisticDiode(p){
-  const g=mk("g",{transform:`translate(${p.x},${p.y}) rotate(${diodeRotation(p)})`,class:"realistic-diode"});
+  const g=mk("g",{transform:`translate(${p.x},${p.y}) rotate(${diodeRotation(p)})`,class:"realistic-diode",opacity:componentEnabled(p)?1:.42});
   const bodyFill=p.damaged?"#67272a":"#171a1f",bodyStroke=p.conducting&&!p.damaged?"#54d989":"#4e5964";
-  g.appendChild(mk("text",{class:"component-title",x:0,y:-22,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"#263545"},"ไดโอด 1N4007"));
+  g.appendChild(mk("text",{class:"component-title",x:0,y:-22,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"#263545"},componentName(p)));
   g.appendChild(mk("line",{x1:-DIODE_LEAD_END,y1:0,x2:-27,y2:0,stroke:"#b8c0c7","stroke-width":2.6,"stroke-linecap":"round"}));
   g.appendChild(mk("line",{x1:27,y1:0,x2:DIODE_LEAD_END,y2:0,stroke:"#b8c0c7","stroke-width":2.6,"stroke-linecap":"round"}));
   g.appendChild(mk("circle",{cx:-DIODE_LEAD_END,cy:0,r:3.4,fill:"#d4d9de",stroke:"#78838d","stroke-width":1}));
@@ -1146,6 +1678,11 @@ function realisticDiode(p){
     hit.dataset.pid=p.id+"."+pin;hit.appendChild(mk("title",{},`${p.id}.${pin} — ${label}`));g.appendChild(hit);
     g.appendChild(mk("text",{class:"component-pin-label",x,y:18,"text-anchor":"middle","font-size":9,"font-weight":700,fill:"#344454"},pin));
   });
+  const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"});
+  gear.appendChild(mk("circle",{cx:48,cy:-18,r:10,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));
+  gear.appendChild(mk("text",{x:48,y:-14,"text-anchor":"middle","font-size":12,fill:"#334155"},"⚙"));
+  gear.appendChild(mk("title",{},"ตั้งค่าอุปกรณ์"));
+  gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;document.querySelector('.tab[data-p="dmm"]')?.click();render();};g.appendChild(gear);
   g.appendChild(mk("title",{},`1N4007 • A = ปลายดำ • K = แถบเงิน • หมุน ${diodeRotation(p)}°`));
   g.dataset.pid=p.id;
   return g;
@@ -1153,19 +1690,20 @@ function realisticDiode(p){
 function render(){
   const circuit=solveAll();
   wireL.innerHTML="";partL.innerHTML="";selectionL.innerHTML="";
-  S().wires.forEach((w,i)=>{const a=pinPos(w.a),b=pinPos(w.b);if(!a||!b)return;
-    const d=curveD(a,b),col=w.c||"#2fbf5f",state=wireState(w,circuit.V);
-    wireL.appendChild(mk("path",{class:"wire-sleeve",d}));
-    const el=mk("path",{class:"wire wire-core",d,stroke:col});
+  const gridJunctions=new Map();
+  S().wires.forEach((w,i)=>{const a=wireEndpointPoint(w,"a"),b=wireEndpointPoint(w,"b");if(!a||!b)return;
+    const d=curveD(a,b),col=w.c||WIRE_COLORS[0],state=wireState(w,circuit.V),wireData={"data-wire-index":i};
+    wireL.appendChild(mk("path",{class:"wire-sleeve",d,...wireData}));
+    const el=mk("path",{class:"wire wire-core",d,stroke:col,...wireData});
     el.addEventListener("pointerdown",e=>{if(arm)return;e.stopPropagation();sel=null;selWire=w;render();});
     el.addEventListener("contextmenu",e=>{e.preventDefault();e.stopPropagation();snap();delWire(w);});wireL.appendChild(el);
-    wireL.appendChild(mk("path",{class:"wire-flow"+(state.live?" live":"")+(state.reverse?" reverse":""),d}));
-    [[a.x,a.y],[b.x,b.y]].forEach(([x,y])=>{wireL.appendChild(mk("circle",{class:"wire-terminal",cx:x,cy:y,r:5,fill:col}));
-      wireL.appendChild(mk("circle",{cx:x,cy:y,r:2.1,fill:"#e8edf2",style:"pointer-events:none"}));});
+    wireL.appendChild(mk("path",{class:"wire-flow"+(state.live?" live":"")+(state.reverse?" reverse":""),d,"data-wire-index":i}));
+    wireL.appendChild(wireHandle(w,i,"a",a,col));wireL.appendChild(wireHandle(w,i,"b",b,col));
+    [w.a,w.b].forEach(endpoint=>{if(!isGridNode(endpoint))return;const point=gridNodePos(endpoint),record=gridJunctions.get(endpoint)||{point,count:0};record.count++;gridJunctions.set(endpoint,record);});
     /* ป้ายกระแสไฟฟ้าโดยประมาณกลางสาย (mA/A) — เหมือนภาพตัวอย่างที่แนบ */
     if(state.live&&selWire!==w){
       const amp=Math.max(PIN_I[w.a]||0,PIN_I[w.b]||0),m=bezMid(a,b),txt=fmtAmpsLabel(amp);
-      const lg=mk("g",{style:"pointer-events:none"});
+      const lg=mk("g",{style:"pointer-events:none","data-wire-current-label":i});
       lg.appendChild(mk("rect",{x:m.x-(txt.length*3.6+6),y:m.y-9,width:txt.length*7.2+12,height:14,rx:5,
         fill:"#fffef0",opacity:.88,stroke:"#8a8f3a","stroke-width":.6}));
       lg.appendChild(mk("text",{x:m.x,y:m.y+2,"text-anchor":"middle","font-size":9.5,"font-weight":700,
@@ -1173,9 +1711,16 @@ function render(){
       wireL.appendChild(lg);
     }
   });
+  /* A shared grid coordinate is a true junction.  Draw it once so a bundle
+     of wires reads as a connection point rather than accidentally-overlapped
+     line ends. */
+  gridJunctions.forEach(({point,count})=>{if(count>1){
+    wireL.appendChild(mk("circle",{class:"wire-junction",cx:point.x,cy:point.y,r:4.5}));
+    wireL.appendChild(mk("title",{},`จุดต่อร่วม ${count} สาย`));
+  }});
   S().parts.forEach(p=>{
     if(p.type==="DIODE"){partL.appendChild(realisticDiode(p));return;}
-    const d=DEF[p.type],g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-component"});
+    const d=DEF[p.type],g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-component",opacity:componentEnabled(p)?1:.42});
     const art=partIcon(p),sc=ICON_BOX/30;
     art.setAttribute("transform",`translate(${(d.w-ICON_BOX)/2},10) scale(${sc})`);
     g.appendChild(art);
@@ -1190,6 +1735,8 @@ function render(){
       c.appendChild(mk("title",{},`${p.id}.${pn[0]} — ${pn[1]}`));g.appendChild(c);
       if(p.type==="ECU")appendEcuPinLabel(g,terminal,pn[0]);
       else if(p.type==="RELAY")appendRelayPinLabel(g,terminal,pn[0]);
+      else if(p.type==="IGN"||p.type==="STARTER")appendStandardPinLabel(g,terminal,pn[0],p.type);
+      else if(SENSOR_TERMINAL_DETAILS[p.type]?.[pn[0]])appendSensorPinLabel(g,terminal,pn[0],p.type);
       else g.appendChild(mk("text",{class:"component-pin-label",x:terminal.x,y:terminal.y+20,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#344454"},pn[0]));});
     if(hasConfigurableSettings(p)){
       const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"}),gx=d.w/2+38,gy=11;
@@ -1198,6 +1745,12 @@ function render(){
       gear.appendChild(mk("title",{},"ตั้งค่าอุปกรณ์"));
       gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;document.querySelector('.tab[data-p="dmm"]')?.click();render();};
       g.appendChild(gear);
+    }
+    if(p.type==="IGN"){
+      const rotor=mk("circle",{class:"no-drag",cx:d.w/2,cy:52,r:33,fill:"transparent",style:"cursor:pointer"});
+      rotor.appendChild(mk("title",{},"คลิกหน้าสวิตช์เพื่อหมุน LOCK → ACC → ON → START"));
+      rotor.onpointerup=e=>{e.stopPropagation();snap();cycleIgnitionStage(p);playUiSound("click");render();};
+      g.appendChild(rotor);
     }
     if(TOGGLE_TYPES.has(p.type)){
       const on=!!p.on,cx=d.w/2+34,cy=24;
@@ -1218,11 +1771,12 @@ function render(){
         stroke:"#12161b","stroke-width":1.5}));
       g.appendChild(mk("title",{},p.energized?"คอยล์ทำงาน — หน้าสัมผัสต่อ":"คอยล์ไม่ทำงาน"));
     }
-    if(["LEDp","BULB","BUZZ","BELL","FAN"].includes(p.type)){
+    if(["LEDp","BULB","BUZZ","BELL","FAN","STARTER"].includes(p.type)){
       const lit=!!p.lit;
-      g.appendChild(mk("circle",{cx:d.w/2+34,cy:24,r:9,fill:lit?"#ffe680":"#e3e8ee",
-        opacity:lit?1:.7,stroke:lit?"#ffd400":"#c7cfd8","stroke-width":lit?2:1}));
-      g.appendChild(mk("title",{},lit?"ทำงานอยู่ (มีไฟจ่ายครบวงจร)":"ไม่มีไฟ / วงจรยังไม่ครบ"));
+      const overload=p.type==="STARTER"&&p.overload;
+      g.appendChild(mk("circle",{class:"component-live-indicator","data-part-id":p.id,cx:d.w/2+34,cy:24,r:9,fill:overload?"#e05252":lit?"#ffe680":"#e3e8ee",
+        opacity:lit||overload?1:.7,stroke:overload?"#b42318":lit?"#ffd400":"#c7cfd8","stroke-width":lit||overload?2:1}));
+      g.appendChild(mk("title",{},overload?"⚠ มอเตอร์ติดขัด — กระแสเกิน":lit?"ทำงานอยู่ (มีไฟจ่ายครบวงจร)":"ไม่มีไฟ / วงจรยังไม่ครบ"));
     }
     if(p.damaged){
       const badge=mk("g",{class:"no-drag",style:"cursor:pointer"});
@@ -1245,9 +1799,10 @@ function render(){
   }
   S().parts.filter(p=>p.type==="BATT"&&batteryIsEmpty(p)).forEach(p=>selectionL.appendChild(batteryRechargeButton(p)));
   if(selWire&&S().wires.includes(selWire)){
-    const a=pinPos(selWire.a),b=pinPos(selWire.b);
+    const a=wireEndpointPoint(selWire,"a"),b=wireEndpointPoint(selWire,"b");
     if(a&&b){const m=bezMid(a,b);
-      selectionL.appendChild(canvasDeleteButton(m.x,m.y,"ลบสายไฟ",()=>{snap();delWire(selWire);}));}
+      selectionL.appendChild(canvasDeleteButton(m.x-13,m.y,"ลบสายไฟ",()=>{snap();delWire(selWire);}));
+      selectionL.appendChild(wireColorButton(m.x+13,m.y,selWire));}
   }
   drawThumbs();updateStatus();buildInspector();buildDMM();buildScope();updateToolbarStates();
 }
@@ -1256,10 +1811,63 @@ function updateToolbarStates(){
  $("btnRun").textContent=running?"⏸ หยุดการจำลอง (ระบบ ON)":"▶ เริ่มการจำลอง (ระบบ OFF)";
  $("btnToggleDmm").classList.toggle("act",dmmVisible);
  $("btnToggleScope").classList.toggle("act",scopeVisible);
+ $("btnWireTool")?.classList.toggle("act",wireToolArmed);
 }
-let drag=null,wiring=null;
+let drag=null,wiring=null,wireDrag=null,wireToolArmed=false;
 const pt=e=>clientToSvg(e.clientX,e.clientY);
+function setWireToolArmed(active){
+ wireToolArmed=!!active;
+ if(wireToolArmed){
+  arm=null;document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));stage.style.cursor="crosshair";
+  showToast("🟡 เครื่องมือสายไฟ: ลากจากพินหรือจุดกริดไปยังปลายทาง");
+ }else if(!arm)stage.style.cursor="default";
+ updateToolbarStates();
+}
+function startWireEndpointDrag(event,wire,index,end){
+ if(arm||wireDrag)return;
+ event.preventDefault();event.stopPropagation();
+ const initial=pinPos(wire[end]);if(!initial)return;
+ sel=null;selWire=wire;
+ wireDrag={wire,index,end,point:initial,pointerId:event.pointerId};
+ stage.setPointerCapture(event.pointerId);
+ updateWireEndpointPreview();
+}
+function updateWireEndpointPreview(){
+ if(!wireDrag)return;
+ const {wire,index,end}=wireDrag,a=wireEndpointPoint(wire,"a"),b=wireEndpointPoint(wire,"b");if(!a||!b)return;
+ const d=curveD(a,b);
+ wireL.querySelectorAll(`[data-wire-index="${index}"]`).forEach(el=>el.setAttribute("d",d));
+ const handle=wireL.querySelector(`[data-wire-handle="${index}:${end}"]`);
+ if(handle)handle.setAttribute("transform",`translate(${wireDrag.point.x},${wireDrag.point.y})`);
+ wireL.querySelector(`[data-wire-current-label="${index}"]`)?.setAttribute("opacity","0");
+}
+function nearestDropTarget(event){
+ const element=document.elementFromPoint(event.clientX,event.clientY),directPin=element?.closest?.(".pin");
+ return directPin?.dataset.pid||nearestConnectablePin(pt(event))||gridNodeId(pt(event));
+}
+function finishWireEndpointDrag(event,cancelled=false){
+ if(!wireDrag||event.pointerId!==wireDrag.pointerId)return false;
+ const {wire,end}=wireDrag,original=wire[end];
+ if(!cancelled){
+  const target=nearestDropTarget(event),otherEndName=end==="a"?"b":"a";
+  if(target&&target!==original&&target!==wire[otherEndName]){
+   const nextA=end==="a"?target:wire.a,nextB=end==="b"?target:wire.b;
+   const duplicate=S().wires.some(other=>other!==wire&&k2(other.a,other.b)===k2(nextA,nextB));
+   if(!duplicate){snap();wire[end]=target;}
+   else showToast("สายไฟเส้นนี้มีการเชื่อมต่อซ้ำอยู่แล้ว");
+  }
+ }
+ if(stage.hasPointerCapture?.(event.pointerId))stage.releasePointerCapture(event.pointerId);
+ wireDrag=null;render();return true;
+}
 stage.addEventListener("pointerdown",e=>{const P=pt(e);
+  if(wireToolArmed){
+    if(e.target.closest?.(".no-drag"))return;
+    const directPin=e.target.closest?e.target.closest(".pin"):null;
+    /* The toolbar tool can begin a wire at an empty perfboard hole too. */
+    wiring=directPin?.dataset.pid||nearestConnectablePin(P)||gridNodeId(P);
+    stage.setPointerCapture(e.pointerId);return;
+  }
   if(arm){snap();const newPart={id:"P"+(seq++),type:arm,x:Math.round((P.x-60)/8)*8,
     y:Math.round((P.y-30)/8)*8,val:CTRL[arm]?CTRL[arm][3]:0,fault:"NONE",
     on:arm==="PB"?false:true,energized:false};
@@ -1268,6 +1876,9 @@ stage.addEventListener("pointerdown",e=>{const P=pt(e);
     if(arm==="BATT"){newPart.battVoltage=12;newPart.battCapacity=45;newPart.battCapacityUnit="Ah";newPart.battMaxCurrent=400;newPart.remainingAh=45;newPart.batteryEmpty=false;}
     if(arm==="DIODE")newPart.rot=0;
     if(arm==="RELAY")newPart.relayType="SPDT";
+    if(arm==="APP"){newPart.appConnector="6";newPart.appFault="NORMAL";newPart.limpMode=false;}
+    if(arm==="IGN")newPart.ignitionStage="LOCK";
+    if(arm==="STARTER"){newPart.solenoidR=1;newPart.motorR=.10;newPart.starterFault="NORMAL";newPart.cranking=false;newPart.motorCircuitOn=false;newPart.motorSpinning=false;newPart.solenoidEngaged=false;newPart.bendixPosition=0;}
     if(arm==="RES"){newPart.val=220;newPart.resBandCount=4;newPart.resBands=["red","red","brown","gold"];newPart.resTolerance="gold";newPart.ratedW=.25;newPart.overloadSeconds=0;}
     S().parts.push(newPart);
     document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));arm=null;
@@ -1289,13 +1900,15 @@ stage.addEventListener("pointerdown",e=>{const P=pt(e);
     drag={p,dx:P.x-p.x,dy:P.y-p.y};stage.setPointerCapture(e.pointerId);render();}
   else{sel=null;selWire=null;render();}});
 stage.addEventListener("pointermove",e=>{const P=pt(e);
-  if(wiring){const a=pinPos(wiring);if(a)tmpW.setAttribute("d",curveD(a,P));}
+  if(wireDrag&&e.pointerId===wireDrag.pointerId){wireDrag.point=P;updateWireEndpointPreview();}
+  else if(wiring){const a=pinPos(wiring);if(a)tmpW.setAttribute("d",curveD(a,P));}
   else if(drag&&drag.instr){const pos=drag.instr==="DMM"?dmmPos:scopePos;
     pos.x=Math.round((P.x-drag.dx)/8)*8;pos.y=Math.round((P.y-drag.dy)/8)*8;render();}
   else if(drag&&drag.p){drag.p.x=Math.round((P.x-drag.dx)/8)*8;drag.p.y=Math.round((P.y-drag.dy)/8)*8;render();}});
 stage.addEventListener("pointerup",e=>{tmpW.setAttribute("d","");
+  if(finishWireEndpointDrag(e)){drag=null;return;}
   if(wiring){const el=document.elementFromPoint(e.clientX,e.clientY),directPin=el?.closest?.(".pin");
-    const b=directPin?.dataset.pid||nearestConnectablePin(pt(e));
+    const b=directPin?.dataset.pid||nearestConnectablePin(pt(e))||(wireToolArmed?gridNodeId(pt(e)):null);
     if(b&&b!==wiring){
       if(!S().wires.some(w=>k2(w.a,w.b)===k2(wiring,b))){snap();
         const isProbe=s=>s.startsWith("DMM.")||s.startsWith("SCOPE.");
@@ -1303,19 +1916,24 @@ stage.addEventListener("pointerup",e=>{tmpW.setAttribute("d","");
         if(isProbe(b))S().wires=S().wires.filter(w=>w.a!==b&&w.b!==b);
         const isRedProbe=s=>s==="DMM.RED"||/^SCOPE\..+\.RED$/.test(s);
         const isBlackProbe=s=>s==="DMM.BLACK"||/^SCOPE\..+\.BLACK$/.test(s);
-        let col;
-        if(isRedProbe(wiring)||isRedProbe(b))col="#d32f2f";
-        else if(isBlackProbe(wiring)||isBlackProbe(b))col="#333";
-        else{const t=wiring.split(".")[1]+b.split(".")[1];
-          col=/GND|CHASSIS|-/.test(t)?"#4b5563":/VREF|B\+|\+/.test(t)?"#e05252":"#2fbf5f";}
+        const col=defaultWireColor(wiring,b);
         S().wires.push({a:wiring,b,c:col});}}
     wiring=null;render();}
   drag=null;});
+stage.addEventListener("pointercancel",e=>{if(finishWireEndpointDrag(e,true)){drag=null;return;}tmpW.setAttribute("d","");wiring=null;drag=null;});
 /* ปล่อยปุ่มกดได้แม้ pointerup เกิดนอกตัวปุ่ม/นอก SVG */
-document.addEventListener("pointerup",()=>{if(momentaryPb){const p=momentaryPb;momentaryPb=null;if(p.on){p.on=false;playUiSound("click");render();}}});
+document.addEventListener("pointerup",()=>{
+ if(momentaryPb){const p=momentaryPb;momentaryPb=null;if(p.on){p.on=false;playUiSound("click");render();}}
+ if(ignitionStartHold){const p=ignitionStartHold;ignitionStartHold=null;if(ignitionStage(p)==="START"){setIgnitionStage(p,"ON",false);playUiSound("click",.45);render();}}
+});
 stage.addEventListener("contextmenu",e=>{if(e.target.classList.contains("wire"))e.preventDefault();});
 document.addEventListener("keydown",e=>{
-  if(e.key==="Escape"){arm=null;sel=null;selWire=null;document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));render();}
+  /* Do not let canvas shortcuts steal Arrow keys (or R/D) while the user is
+     typing a property value.  Previously an Arrow key moved the component
+     instead of incrementing its number field, which made connected parts feel
+     impossible to adjust. */
+  if(e.target.closest?.('input, select, textarea, button, [contenteditable="true"]'))return;
+  if(e.key==="Escape"){arm=null;wireToolArmed=false;wiring=null;sel=null;selWire=null;document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));render();}
   if(e.ctrlKey&&e.key.toLowerCase()==="z"){e.preventDefault();undo();}
   if(e.ctrlKey&&e.key.toLowerCase()==="y"){e.preventDefault();redo();}
   if(!sel)return;const p=findP(sel);if(!p)return;
@@ -1333,12 +1951,14 @@ function delPart(id){S().parts=S().parts.filter(p=>p.id!==id);
 /* ═══════════════════════════════════════════════════════════
    ขั้นที่ 5 : เครื่องคำนวณวงจร
    ═══════════════════════════════════════════════════════════ */
-function wiredOK(p){const ecu=S().parts.find(x=>x.type==="ECU");if(!ecu||!REQ[p.type])return false;
-  const st=new Set(S().wires.map(w=>k2(w.a,w.b)));
-  return REQ[p.type].every(([a,b])=>st.has(k2(p.id+"."+a,ecu.id+"."+b)));}
+function wiredOK(p){const ecu=S().parts.find(x=>x.type==="ECU"),requirements=sensorRequirements(p);if(!ecu||!componentEnabled(ecu)||!componentEnabled(p)||!requirements.length)return false;
+  /* Follow a whole wire net, not only a single direct cable.  This makes a
+     sensor wired through one or more GRID junctions electrically valid. */
+  return requirements.every(([a,b])=>wireNodeSet(p.id+"."+a).has(ecu.id+"."+b));}
 /* ส่งค่าต้านทาน DC ของอุปกรณ์ทั้งหมดให้ทั้งมิเตอร์และตัวแก้สมการวงจรใช้ชุดเดียวกัน */
 function componentBranches(p){
   const P=p.id+".", on=!!p.on;
+  if(!componentEnabled(p))return [];
   if(p.damaged&&p.type!=="FUSE2")return [];
   if(p.type==="RES")return [[P+"A",P+"B",resistorResistance(p)]];
   if(p.type==="LDR")return [[P+"A",P+"B",ldrR(p.val)]];
@@ -1348,27 +1968,46 @@ function componentBranches(p){
   if(p.type==="SW"||p.type==="PB")return [[P+"A",P+"B",on ? .05 : INF]];
   if(p.type==="MCB")return [[P+"A",P+"B",on ? .02 : INF]];
   if(p.type==="FUSE2")return [[P+"A",P+"B",on ? .05 : INF]];
-  if(p.type==="DIODE")return [[P+"A",P+"K",p.conducting ? 8 : INF]];
-  if(p.type==="LEDp")return [[P+"A",P+"K",LED_MODEL_R]];
+  if(p.type==="IGN")return [[P+"BAT",P+"ACC",ignitionFeeds(p,"ACC")?.02:INF],
+    [P+"BAT",P+"IGN",ignitionFeeds(p,"IGN")?.02:INF],[P+"BAT",P+"ST",ignitionFeeds(p,"ST")?.02:INF]];
+  if(p.type==="STARTER"){const dead=starterFault(p)==="DEAD";return [[P+"S",P+"GND",dead?INF:starterSolenoidResistance(p)],
+    [P+"B",P+"GND",!dead&&p.motorCircuitOn?starterMotorLoadResistance(p):INF]];}
+  if(p.type==="DIODE")return [[P+"A",P+"K",p.conducting ? diodeForwardResistance(p) : INF]];
+  if(p.type==="LEDp")return [[P+"A",P+"K",ledModelResistance(p)]];
   if(p.type==="BULB")return [[P+"A",P+"B",bulbResistance(p)]];
-  if(p.type==="BUZZ")return [[P+"+",P+"-",400]];
-  if(p.type==="BELL")return [[P+"A",P+"B",160]];
-  if(p.type==="FAN")return [[P+"A",P+"B",80]];
+  if(p.type==="BUZZ")return [[P+"+",P+"-",loadResistance(p,400)]];
+  if(p.type==="BELL")return [[P+"A",P+"B",loadResistance(p,160)]];
+  if(p.type==="FAN")return [[P+"A",P+"B",loadResistance(p,80)]];
   if(p.type==="RELAY"){
-    const branches=[[P+"COIL+",P+"COIL-",400],[P+"COM",P+"NO",p.energized ? .02 : INF]];
+    const branches=[[P+"COIL+",P+"COIL-",relayCoilResistance(p)],[P+"COM",P+"NO",p.energized ? .02 : INF]];
     if(relayType(p)==="SPDT")branches.push([P+"COM",P+"NC",p.energized ? INF : .02]);
     return branches;
   }
-  if(p.type==="XFMR")return [[P+"P1",P+"P2",15],[P+"S1",P+"S2",6]];
+  if(p.type==="XFMR")return [[P+"P1",P+"P2",transformerPrimaryResistance(p)],[P+"S1",P+"S2",transformerSecondaryResistance(p)]];
+  if(p.type==="NPN")return [[P+"B",P+"E",1000],[P+"C",P+"E",p.conducting?channelResistance(p):INF]];
+  if(p.type==="NMOS")return [[P+"D",P+"S",p.conducting?channelResistance(p):INF]];
+  if(p.type==="TRIAC")return [[P+"G",P+"A1",1000],[P+"A1",P+"A2",p.conducting?channelResistance(p):INF]];
   return [];
 }
 function sensorBranches(p){
   const P=p.id+".",f=p.fault||"NONE";
+  if(!componentEnabled(p))return [];
   if(p.type==="ECT"||p.type==="IAT"){let r=ntcR(p.val);if(f==="HIGH_R")r*=3;if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.3;return [[P+"SIG",P+"GND",r]];}
   if(p.type==="TPS"){const total=2400,v=tpsV(p.val),lo=Math.max(5,total*v/VREF),hi=Math.max(5,total-lo);return [[P+"VREF",P+"SIG",hi],[P+"SIG",P+"GND",lo]];}
+  if(p.type==="APP"){
+   let r=2400;if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.3;if(f==="HIGH_R")r=7500;
+   const branches=[[P+"VREF1",P+"GND1",r],[P+"VREF2",P+"GND2",r]];
+   if(appConnector(p)==="9")branches.push([P+"IDLE",P+"GND-I",Number(p.val||0)<=1?.05:INF]);
+   return branches;
+  }
   if(p.type==="MAP")return [[P+"VREF",P+"GND",10000]]; /* output ของ MAP เป็น active, ไม่ใช่ตัวต้านทานแบ่งแรงดัน */
   if(p.type==="CKP_HALL")return [[P+"GND",P+"SIG",INF],[P+"SIG",P+"B+",INF]];
   if(p.type==="CKP_VR"){let r=950;if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.4;if(f==="HIGH_R")r=4200;return [[P+"S+",P+"S-",r]];}
+  if(p.type==="MAF"){let r=ntcR(mafIatTemp(p));if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.3;if(f==="HIGH_R")r*=3;return [[P+"IAT",P+"GND",r]];}
+  if(p.type==="O2"){let r=8;if(f==="OPEN")r=INF;if(f==="SHORT_GND")r=.3;if(f==="HIGH_R")r=30;return [[P+"Heater+",P+"Heater-",r]];}
+  if(p.type==="CMP_HALL")return [[P+"GND",P+"SIG",INF],[P+"SIG",P+"B+",INF]];
+  if(p.type==="CMP_VR"){let r=750;if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.4;if(f==="HIGH_R")r=3300;return [[P+"S+",P+"S-",r]];}
+  if(p.type==="KNOCK"){let r=1000000;if(f==="OPEN")r=INF;if(f==="SHORT_GND")r=.4;if(f==="HIGH_R")r=3000000;return [[P+"SIG",P+"GND",r]];}
   return [];
 }
 /* Nodal DC solver แบบต้านทาน: สายไฟรวมเป็น node เดียว, สวิตช์/โหลดมีค่า Ω จริง
@@ -1381,15 +2020,15 @@ function solveDcNetwork(branches){
   Object.keys(parent).forEach(root);
   const fixed={},setFixed=(n,v)=>{n=root(n);if(fixed[n]===undefined)fixed[n]=v;};
   setFixed("CHASSIS",0);
-  S().parts.forEach(p=>{const P=p.id+".";
+  S().parts.forEach(p=>{const P=p.id+".";if(!componentEnabled(p))return;
     if(p.type==="BATT"&&!p.damaged){setFixed(P+"-",0);setFixed(P+"+",batteryTerminalVoltage(p));}
     if(p.type==="PSU"&&!p.damaged){setFixed(P+"-",0);setFixed(P+"+",Math.max(0,+p.val||0));}
     /* AC participates in the netlist with its signed instantaneous sine
        voltage.  A bridge therefore forward-biases the opposite diode pair on
        each half-cycle instead of permanently holding one pair at 0 mA. */
     if(p.type==="AC"&&!p.damaged){setFixed(P+"B",0);setFixed(P+"A",acInstantVoltage(p));}
-    if(p.type==="GND")setFixed(P+"G",0);
-    if(p.type==="ECU"){setFixed(P+"GND-S",.03);setFixed(P+"VREF",VREF);setFixed(P+"B+",VBATT);}
+    if(p.type==="GND")setFixed(P+"G",groundPotential(p));
+    if(p.type==="ECU"){setFixed(P+"GND-S",.03);setFixed(P+"VREF",ecuReferenceVoltage(p));setFixed(P+"B+",ecuSupplyVoltage(p));}
   });
   const adj={};const add=(a,b,r)=>{if(!isFinite(r)||r<=0)return;a=root(a);b=root(b);if(a===b)return;(adj[a]=adj[a]||[]).push([b,r]);(adj[b]=adj[b]||[]).push([a,r]);};
   branches.forEach(([a,b,r])=>add(a,b,r));
@@ -1408,6 +2047,7 @@ function wireNodeSet(start){
  return seen;
 }
 function batteryLiveData(p,branches,V){
+ if(!componentEnabled(p)){p.outputCurrent=0;p.actualVoltage=0;p.actualCurrent=0;p.actualPower=0;p.currentLimited=false;return {voltage:0,current:0,power:0,soc:batterySoc(p),remainingAh:batteryRemainingAh(p)};}
  const P=p.id+".+",positiveNet=wireNodeSet(P);let current=0;
  branches.forEach(([a,b,r])=>{
    if(!isFinite(r)||r<=0)return;
@@ -1434,7 +2074,7 @@ function advanceSimulation(){
  const now=performance.now();if(!lastBatteryTick){lastBatteryTick=now;return false;}
  const dt=Math.min(.25,Math.max(0,(now-lastBatteryTick)/1000));lastBatteryTick=now;if(!dt)return false;
  let topologyChanged=false;
- S().parts.filter(p=>p.type==="BATT"&&!p.damaged&&!batteryIsEmpty(p)).forEach(p=>{
+ S().parts.filter(p=>p.type==="BATT"&&componentEnabled(p)&&!p.damaged&&!batteryIsEmpty(p)).forEach(p=>{
   const before=batteryRemainingAh(p),used=Math.max(0,Number(p.outputCurrent)||0)*dt*BATTERY_SIM_SECONDS_PER_REAL_SECOND/3600;
   p.remainingAh=Math.max(0,before-used);
   if(p.remainingAh<=.000001){
@@ -1454,13 +2094,46 @@ function advanceSimulation(){
 }
 function vrPeak(rpm){return .5+Math.max(0,+rpm||0)*.0025;}
 function applySensorSignals(V,R){
-  const ecu=S().parts.find(x=>x.type==="ECU");if(!ecu)return;
-  S().parts.forEach(p=>{if(!REQ[p.type])return;const P=p.id+".",f=p.fault||"NONE",ok=wiredOK(p);
-    if(!ok)return;
-    if(p.type==="ECT"||p.type==="IAT"){let r=ntcR(p.val);if(f==="HIGH_R")r*=3;let v=divV(r),g=f==="HIGH_R"?.85:.03;if(f==="OPEN"){v=VREF;r=INF;}if(f==="SHORT_GND"){v=0;r=.3;}if(f==="SHORT_BP")v=VBATT;R[k2(P+"SIG",P+"GND")]=r;V[P+"SIG"]=v;V[P+"GND"]=g;V[ecu.id+"."+(p.type==="ECT"?"SIG-A":"SIG-D")]=v;V[ecu.id+".GND-S"]=g;}
-    if(p.type==="TPS"||p.type==="MAP"){let v=p.type==="TPS"?tpsV(p.val):mapV(p.val),vr=VREF,g=.03;if(f==="OPEN"){v=VREF;vr=0;}if(f==="SHORT_GND")v=0;if(f==="SHORT_BP")v=VBATT;if(f==="HIGH_R"){g=.9;v=Math.min(VBATT,v+.9);}V[P+"VREF"]=vr;V[P+"SIG"]=v;V[P+"GND"]=g;V[ecu.id+".VREF"]=vr;V[ecu.id+"."+(p.type==="TPS"?"SIG-B":"SIG-E")]=v;V[ecu.id+".GND-S"]=g;}
-    if(p.type==="CKP_HALL"){let s=2.5,bp=VBATT,g=.03;if(f==="OPEN"){s=0;bp=0;}if(f==="SHORT_GND")s=0;if(f==="SHORT_BP")s=VBATT;if(f==="HIGH_R"){g=1.1;s=1.6;}V[P+"GND"]=g;V[P+"SIG"]=s;V[P+"B+"]=bp;V[ecu.id+".SIG-C"]=s;V[ecu.id+".B+"]=bp;V[ecu.id+".GND-S"]=g;}
-    if(p.type==="CKP_VR"){let a=vrPeak(p.val);if(f!=="NONE")a=f==="HIGH_R"?a*.35:0;V[P+"S+"]=a/Math.SQRT2;V[P+"S-"]=0;V[ecu.id+".SIG-C"]=a/Math.SQRT2;}
+  const ecu=S().parts.find(x=>x.type==="ECU"),ecuOn=!!ecu&&componentEnabled(ecu);
+  const vref=ecuOn?(V[ecu.id+".VREF"]??ecuReferenceVoltage(ecu)):VREF,vbatt=ecuOn?(V[ecu.id+".B+"]??ecuSupplyVoltage(ecu)):VBATT,
+        sensorDiv=r=>r===INF?vref:vref*r/(RPULL+r),ecuSet=(pin,value)=>{if(ecuOn)V[ecu.id+"."+pin]=value;};
+  S().parts.forEach(p=>{if(!REQ[p.type]||!componentEnabled(p))return;const P=p.id+".",f=p.fault||"NONE",ok=!ecuOn||wiredOK(p);
+    if(!ok){if(p.type==="APP"){p.appLimpMode=false;p.appDtc="";p.appDtcAlerted=false;}return;}
+    if(p.type==="ECT"||p.type==="IAT"){let r=ntcR(p.val);if(f==="HIGH_R")r*=3;let v=sensorDiv(r),g=f==="HIGH_R"?.85:.03;if(f==="OPEN"){v=vref;r=INF;}if(f==="SHORT_GND"){v=0;r=.3;}if(f==="SHORT_BP")v=vbatt;R[k2(P+"SIG",P+"GND")]=r;V[P+"SIG"]=v;V[P+"GND"]=g;ecuSet(p.type==="ECT"?"SIG-A":"SIG-D",v);ecuSet("GND-S",g);}
+    if(p.type==="APP"){
+     const pins=appSignalPins(p),press=Math.max(0,Math.min(100,Number(p.val)||0)),targetFault=appFault(p);
+     let aps1=.8+3.4*press/100,aps2=aps1/2,g1=.03,g2=.03;
+     /* Existing generic faults remain useful for whole-device teaching;
+        APP-specific faults below isolate just one redundant channel. */
+     if(f==="OPEN"||f==="SHORT_GND"){aps1=0;aps2=0;}
+     if(f==="SHORT_BP"){aps1=vref;aps2=vref;}
+     if(f==="HIGH_R"){g1=.85;g2=.65;}
+     if(targetFault==="APS1_OPEN"||targetFault==="APS1_SHORT_GND")aps1=0;
+     if(targetFault==="APS1_SHORT_BP")aps1=vref;
+     if(targetFault==="APS2_OPEN"||targetFault==="APS2_SHORT_GND")aps2=0;
+     if(targetFault==="APS2_SHORT_BP")aps2=vref;
+     if(targetFault==="MISMATCH")aps2=Math.max(0,Math.min(vref,aps1*.72+.18));
+     const mismatch=Math.abs(aps1-2*aps2)>.16,limp=f!=="NONE"||targetFault!=="NORMAL"||mismatch;
+     let dtc="";
+     if(targetFault.startsWith("APS1"))dtc="P2122/P2123 — APP1 circuit";
+     else if(targetFault.startsWith("APS2"))dtc="P2127/P2128 — APP2 circuit";
+     else if(mismatch)dtc="P2138 — APP1/APP2 correlation";
+     else if(f!=="NONE")dtc="P2120 — APP circuit fault";
+     p.aps1Voltage=aps1;p.aps2Voltage=aps2;p.appLimpMode=limp;p.appDtc=dtc;
+     if(limp&&!p.appDtcAlerted){p.appDtcAlerted=true;showToast(`⚠ ${p.id}: ${dtc||"APP ผิดปกติ"} — ECU เข้า Limp Home`);}
+     if(!limp)p.appDtcAlerted=false;
+     V[P+"VREF1"]=vref;V[P+"GND1"]=g1;V[P+pins.one]=aps1;
+     V[P+"VREF2"]=vref;V[P+"GND2"]=g2;V[P+pins.two]=aps2;
+     R[k2(P+"VREF1",P+"GND1")]=2400;R[k2(P+"VREF2",P+"GND2")]=2400;
+     ecuSet("VREF",vref);ecuSet("GND-S",Math.max(g1,g2));ecuSet("APP1",aps1);ecuSet("APP2",aps2);
+     if(appConnector(p)==="9"){const idle=press<=1?0:vref;V[P+"IDLE"]=idle;V[P+"GND-I"]=0;V[P+"NC"]=0;R[k2(P+"IDLE",P+"GND-I")]=press<=1?.05:INF;ecuSet("IVS",idle);}
+    }
+    if(p.type==="TPS"||p.type==="MAP"){let v=p.type==="TPS"?vref*(.11+.78*p.val/100):vref*(.06+.87*(p.val-20)/81),vr=vref,g=.03;if(f==="OPEN"){v=vref;vr=0;}if(f==="SHORT_GND")v=0;if(f==="SHORT_BP")v=vbatt;if(f==="HIGH_R"){g=.9;v=Math.min(vbatt,v+.9);}V[P+"VREF"]=vr;V[P+"SIG"]=v;V[P+"GND"]=g;ecuSet("VREF",vr);ecuSet(p.type==="TPS"?"SIG-B":"SIG-E",v);ecuSet("GND-S",g);}
+    if(p.type==="CKP_HALL"||p.type==="CMP_HALL"){let s=vref/2,bp=vbatt,g=.03;if(f==="OPEN"){s=0;bp=0;}if(f==="SHORT_GND")s=0;if(f==="SHORT_BP")s=vbatt;if(f==="HIGH_R"){g=1.1;s=vref*.32;}V[P+"GND"]=g;V[P+"SIG"]=s;V[P+"B+"]=bp;ecuSet(p.type==="CKP_HALL"?"SIG-C":"CMP",s);ecuSet("B+",bp);ecuSet("GND-S",g);}
+    if(p.type==="CKP_VR"||p.type==="CMP_VR"){let a=vrPeak(p.val)*(p.type==="CMP_VR"?.78:1);if(f!=="NONE")a=f==="HIGH_R"?a*.35:0;V[P+"S+"]=a/Math.SQRT2;V[P+"S-"]=0;ecuSet(p.type==="CKP_VR"?"SIG-C":"CMP",a/Math.SQRT2);}
+    if(p.type==="MAF"){let r=ntcR(mafIatTemp(p));if(f==="HIGH_R")r*=3;let flow=.5+4*Math.max(0,Math.min(100,+p.val||0))/100,iat=sensorDiv(r),g=.03;if(f==="OPEN"){flow=0;iat=vref;r=INF;}if(f==="SHORT_GND"){flow=0;iat=0;r=.3;}if(f==="SHORT_BP"){flow=vbatt;iat=vbatt;}V[P+"B+"]=vbatt;V[P+"GND"]=g;V[P+"VREF"]=vref;V[P+"MAF"]=flow;V[P+"IAT"]=iat;R[k2(P+"IAT",P+"GND")]=r;ecuSet("B+",vbatt);ecuSet("VREF",vref);ecuSet("GND-S",g);ecuSet("MAF",flow);ecuSet("SIG-D",iat);}
+    if(p.type==="O2"){let signal=.1+.8*Math.max(0,Math.min(100,+p.val||0))/100;if(f==="OPEN")signal=0;if(f==="SHORT_GND")signal=0;if(f==="SHORT_BP")signal=vbatt;V[P+"Heater+"]=vbatt;V[P+"Heater-"]=0;V[P+"Signal+"]=signal;V[P+"Signal-"]=0;ecuSet("O2",signal);ecuSet("GND-S",0);}
+    if(p.type==="KNOCK"){let signal=.02+1.5*Math.max(0,Math.min(100,+p.val||0))/100;if(f==="OPEN"||f==="SHORT_GND")signal=0;if(f==="SHORT_BP")signal=vbatt;V[P+"SIG"]=signal;V[P+"GND"]=0;ecuSet("KNOCK",signal);ecuSet("GND-S",0);}
   });
 }
 /* ตรวจตัวต้านทานที่อยู่ในเส้นทางจากแหล่งจ่ายถึง LED โดยไม่เดินผ่าน LED ดวงนั้นเอง
@@ -1484,7 +2157,7 @@ function reachesThroughResistor(adj,start,end){
 }
 function electricalSources(){
  const out=[];
- S().parts.forEach(p=>{if(p.damaged)return;const P=p.id+".";
+ S().parts.forEach(p=>{if(p.damaged||!componentEnabled(p))return;const P=p.id+".";
    if(p.type==="BATT"||p.type==="PSU")out.push({plus:P+"+",minus:P+"-"});
    if(p.type==="AC")out.push({plus:P+"A",minus:P+"B"});
    if(p.type==="ECU"){out.push({plus:P+"VREF",minus:P+"GND-S"});out.push({plus:P+"B+",minus:P+"GND-S"});}
@@ -1497,8 +2170,8 @@ function ledHasSeriesResistor(led){
   reachesThroughResistor(adj,source.plus,P+"A")||reachesThroughResistor(adj,P+"K",source.minus));
 }
 function ledLiveData(p,V){
- const spec=ledSpec(p),P=p.id+".",voltage=Math.max(0,(V[P+"A"]??0)-(V[P+"K"]??0));
- const current=p.damaged?0:voltage/LED_MODEL_R;
+  const spec=ledSpec(p),P=p.id+".",voltage=Math.max(0,(V[P+"A"]??0)-(V[P+"K"]??0));
+ const current=p.damaged||!componentEnabled(p)?0:voltage/ledModelResistance(p);
  const data={voltage,current,power:voltage*current,spec,currentLimited:ledHasSeriesResistor(p)};
  p.actualVoltage=voltage;p.actualCurrent=current;p.actualPower=data.power;p.currentLimited=data.currentLimited;
  return data;
@@ -1509,11 +2182,27 @@ function bulbLiveData(p,V){
   p.actualVoltage=voltage;p.actualCurrent=current;p.actualPower=data.power;p.hotResistance=resistance;
   return data;
 }
+function starterLiveData(p,V){
+ const P=p.id+".",mode=starterFault(p),sVoltage=Math.abs((V[P+"S"]??0)-(V[P+"GND"]??0)),motorVoltage=Math.abs((V[P+"B"]??0)-(V[P+"GND"]??0));
+ const solenoidCurrent=p.damaged||mode==="DEAD"?0:sVoltage/starterSolenoidResistance(p);
+ const motorCurrent=!p.damaged&&p.motorCircuitOn?motorVoltage/starterMotorLoadResistance(p):0;
+ const rpm=p.motorSpinning?Math.round(Math.max(0,Math.min(mode==="FREE_SPIN"?5200:3200,(mode==="FREE_SPIN"?4300:2600)*motorVoltage/12))):0;
+ const target=p.solenoidEngaged?1:0,current=Math.max(0,Math.min(1,Number(p.bendixPosition)||0));
+ p.bendixPosition=Math.abs(target-current)<.01?target:current+(target-current)*(target?0.28:0.42);
+ p.sVoltage=sVoltage;p.motorVoltage=motorVoltage;p.solenoidCurrent=solenoidCurrent;p.motorCurrent=motorCurrent;
+ p.actualVoltage=motorVoltage;p.actualCurrent=motorCurrent;p.actualPower=motorVoltage*motorCurrent;p.rpm=rpm;p.lit=!!(p.solenoidEngaged||p.motorSpinning);p.overload=mode==="JAMMED"&&!!p.motorCircuitOn;
+ if(p.overload&&!p.overloadAlerted){p.overloadAlerted=true;showToast(`⚠ มอเตอร์สตาร์ท ${p.id} ติดขัด — กระแส ${fmtAmpsLabel(motorCurrent)} สูง, แรงดันระบบตก`);}
+ if(!p.overload)p.overloadAlerted=false;
+ return {mode,sVoltage,motorVoltage,solenoidCurrent,motorCurrent,rpm,power:p.actualPower,engaged:!!p.solenoidEngaged,spinning:!!p.motorSpinning,overload:!!p.overload};
+}
 function livePartTooltip(p){
  if(p.type==="BATT")return `แบตเตอรี่ ${batteryNominalVoltage(p)} V • ${batteryCapacityDisplay(p)} ${batteryCapacityUnit(p)}\nแรงดันขณะจ่าย: ${fmtV(p.actualVoltage||0)} • กระแส: ${fmtmA(p.outputCurrent||0)}\nเหลือ ${fmtAh(batteryRemainingAh(p))} (${batterySoc(p).toFixed(1)}%)${batteryIsEmpty(p)?"\nสถานะ: พลังงานหมด — วงจรเปิด":""}`;
  if(p.type==="RES")return `ตัวต้านทาน ${formatResistance(resistorResistance(p))} ±${resistorTolerance(p)}%\n${resistorBandLabel(p)}\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)} • ${fmtW(p.actualPower||0)}\nพิกัด: ${fmtW(resistorRatedPower(p))}${p.damaged?"\nสถานะ: ไหม้ / วงจรเปิด":""}`;
  if(p.type==="LEDp"){const s=ledSpec(p);return `LED ${s.name}\nVf ${fmtV(s.vf)} • Imax ${fmtmA(s.imax)}\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)}\n${p.damaged?"สถานะ: ขาด / วงจรเปิด":p.currentLimited?"มีตัวต้านทานจำกัดกระแส":"ยังไม่พบตัวต้านทานจำกัดกระแส"}`;}
  if(p.type==="BULB"){const rv=bulbRatedVoltage(p),rw=bulbRatedPower(p);return `หลอดไฟ ${fmtV(rv)} / ${fmtW(rw)}\nR = ${bulbResistance(p).toFixed(1)} Ω\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)} • ${fmtW(p.actualPower||0)}\n${p.damaged?"สถานะ: ไส้ขาด / วงจรเปิด":"Tolerance แรงดัน +18%"}`;}
+ if(p.type==="APP"){const one=Number(p.aps1Voltage)||0,two=Number(p.aps2Voltage)||0;return `APP ${appConnector(p)} พิน • เหยียบ ${Math.round(Number(p.val)||0)}%\nSignal 1: ${fmtV(one)} • Signal 2: ${fmtV(two)}${p.appLimpMode?`\n⚠ Limp Home: ${p.appDtc||"สัญญาณไม่สัมพันธ์"}`:"\n✓ สัญญาณคู่ปกติ (2:1)"}`;}
+ if(p.type==="IGN"){const stage=ignitionStage(p);return `สวิตช์กุญแจ: ${IGNITION_STAGE_LABEL[stage]}\nACC ${ignitionFeeds(p,"ACC")?"จ่ายไฟ":"ตัด"} • IGN ${ignitionFeeds(p,"IGN")?"จ่ายไฟ":"ตัด"} • ST ${ignitionFeeds(p,"ST")?"จ่ายไฟ":"ตัด"}`;}
+ if(p.type==="STARTER"){const mode=starterFault(p);return `มอเตอร์สตาร์ท — ${STARTER_FAULTS[mode].label}\nS: ${fmtV(p.sVoltage||0)} • B: ${fmtV(p.motorVoltage||0)}\nกระแสมอเตอร์: ${fmtAmpsLabel(p.motorCurrent||0)} • RPM: ${Math.round(p.rpm||0)}\nBendix: ${p.solenoidEngaged?"ดันออก":"หดกลับ"}${p.overload?"\n⚠ Locked Rotor / กระแสเกิน":""}`;}
  return "";
 }
 function detectLoadBurnout(V){
@@ -1563,10 +2252,15 @@ function showToast(message){
 /* ลัดวงจร = ทางต้านทานต่ำระหว่างขั้วแหล่งจ่าย; อุปกรณ์ป้องกันจะทำงานก่อนแบตเตอรี่/PSU เสีย */
 function detectElectricalFaults(R){
   if(!running)return false;
-  const sources=S().parts.filter(p=>(p.type==="BATT"||p.type==="PSU"||p.type==="AC")&&!p.damaged&&(p.type!=="BATT"||!batteryIsEmpty(p)));
+ const sources=S().parts.filter(p=>(p.type==="BATT"||p.type==="PSU"||p.type==="AC")&&componentEnabled(p)&&!p.damaged&&(p.type!=="BATT"||!batteryIsEmpty(p)));
   for(const source of sources){
     const P=source.id+".",pins=source.type==="AC"?["A","B"]:["+","-"],r=pathResistance(R,P+pins[0],P+pins[1]);
     if(r===undefined||!isFinite(r)||r>.35)continue;
+    /* A cranking starter is intentionally a ~0.1 Ω high-current load, not a
+       short circuit.  Keep normal starter operation from blowing the source. */
+    const normalStarterLoad=S().parts.some(p=>p.type==="STARTER"&&p.motorCircuitOn&&
+      branchIsInPath(R,P+pins[0],P+pins[1],p.id+".B",p.id+".GND",starterMotorLoadResistance(p),r));
+    if(normalStarterLoad)continue;
     const volts=source.type==="BATT"?batteryTerminalVoltage(source):Math.max(0,+source.val||0),amps=volts/Math.max(.02,r);
     const fuse=S().parts.find(p=>p.type==="FUSE2"&&p.on&&branchIsInPath(R,P+pins[0],P+pins[1],p.id+".A",p.id+".B",.05,r));
     if(fuse){fuse.on=false;fuse.blown=true;fuse.damaged=true;registerCircuitFault(`⚠ ตรวจพบการลัดวงจร ~${amps.toFixed(0)} A — ฟิวส์ ${fuse.id} ขาดเพื่อป้องกันวงจร`,fuse);return true;}
@@ -1585,16 +2279,51 @@ function repairParts(target){
 }
 function solveAll(){
   let V={CHASSIS:0},R={},topologyChanged=false;
-  if(!running){S().parts.forEach(p=>{if(["LEDp","BULB","BUZZ","BELL","FAN"].includes(p.type))p.lit=false;
-    if(["LEDp","BULB","RES","BATT"].includes(p.type)){p.actualVoltage=0;p.actualCurrent=0;p.actualPower=0;}if(p.type==="RELAY")p.energized=false;});lastBatteryTick=0;PIN_I={};return{V,R,topologyChanged};}
+  if(!running){S().parts.forEach(p=>{if(["LEDp","BULB","BUZZ","BELL","FAN","STARTER"].includes(p.type))p.lit=false;
+    if(["LEDp","BULB","RES","BATT","STARTER"].includes(p.type)){p.actualVoltage=0;p.actualCurrent=0;p.actualPower=0;}if(p.type==="RELAY")p.energized=false;if(p.type==="STARTER"){p.cranking=false;p.rpm=0;p.motorCurrent=0;p.solenoidCurrent=0;p.startCommanded=false;p.motorCircuitOn=false;p.motorSpinning=false;p.solenoidEngaged=false;p.bendixPosition=0;}});lastBatteryTick=0;PIN_I={};return{V,R,topologyChanged};}
   topologyChanged=advanceSimulation();
   const branches=[];const rebuildBranches=()=>{R={};branches.length=0;const add=([a,b,r])=>{R[k2(a,b)]=r;branches.push([a,b,r]);};
     S().parts.forEach(p=>{componentBranches(p).forEach(add);sensorBranches(p).forEach(add);});
     /* ECU มี pull-up 2.2 kΩ สำหรับ thermistor inputs */
-    const ecu0=S().parts.find(x=>x.type==="ECU");if(ecu0){add([ecu0.id+".VREF",ecu0.id+".SIG-A",RPULL]);add([ecu0.id+".VREF",ecu0.id+".SIG-D",RPULL]);}};
+    const ecu0=S().parts.find(x=>x.type==="ECU");if(ecu0&&componentEnabled(ecu0)){add([ecu0.id+".VREF",ecu0.id+".SIG-A",RPULL]);add([ecu0.id+".VREF",ecu0.id+".SIG-D",RPULL]);}};
   const stabilize=()=>{
    rebuildBranches();V=solveDcNetwork(branches);
-   for(let pass=0;pass<10;pass++){let changed=false;S().parts.filter(p=>p.type==="RELAY").forEach(p=>{const P=p.id+".",on=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0))>=9;if(on!==!!p.energized){p.energized=on;changed=true;}});S().parts.filter(p=>p.type==="DIODE"&&!p.damaged).forEach(p=>{const P=p.id+".",on=(V[P+"A"]??0)-(V[P+"K"]??0)>=.55;if(on!==!!p.conducting){p.conducting=on;changed=true;}});if(!changed)break;rebuildBranches();V=solveDcNetwork(branches);}
+   for(let pass=0;pass<10;pass++){
+    let changed=false;
+    S().parts.filter(p=>p.type==="RELAY").forEach(p=>{
+      const P=p.id+".",on=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0))>=9;
+      if(on!==!!p.energized){p.energized=on;changed=true;}
+    });
+    S().parts.filter(p=>p.type==="STARTER").forEach(p=>{
+      const P=p.id+".",s=Math.abs((V[P+"S"]??0)-(V[P+"GND"]??0)),b=Math.abs((V[P+"B"]??0)-(V[P+"GND"]??0)),mode=starterFault(p);
+      const commanded=componentEnabled(p)&&!p.damaged&&mode!=="DEAD"&&s>=8;
+      const motorOn=commanded&&starterCanMotorRun(p)&&b>=6;
+      const bendix=commanded&&starterBendixShouldEngage(p);
+      const spinning=motorOn&&(mode==="NORMAL"||mode==="FREE_SPIN");
+      if(commanded!==!!p.startCommanded||motorOn!==!!p.motorCircuitOn||bendix!==!!p.solenoidEngaged||spinning!==!!p.motorSpinning){
+       p.startCommanded=commanded;p.motorCircuitOn=motorOn;p.solenoidEngaged=bendix;p.motorSpinning=spinning;p.cranking=spinning;changed=true;
+      }
+    });
+    S().parts.filter(p=>["NPN","NMOS","TRIAC"].includes(p.type)&&componentEnabled(p)&&!p.damaged).forEach(p=>{
+      const P=p.id+".";
+      const on=p.type==="NPN"?(V[P+"B"]??0)-(V[P+"E"]??0)>=baseThreshold(p):
+       p.type==="NMOS"?(V[P+"G"]??0)-(V[P+"S"]??0)>=gateThreshold(p):
+       Math.abs((V[P+"G"]??0)-(V[P+"A1"]??0))>=triacTriggerVoltage(p);
+      if(on!==!!p.conducting){p.conducting=on;changed=true;}
+    });
+    S().parts.filter(p=>p.type==="DIODE"&&componentEnabled(p)&&!p.damaged).forEach(p=>{
+      const P=p.id+".",vAK=(V[P+"A"]??0)-(V[P+"K"]??0);
+      /* A diode represented by a small forward resistance has only a small
+         voltage drop after it closes.  Requiring +0.55 V on every solver pass
+         therefore made a bridge rectifier alternate open/closed and settle at
+         0 mA.  Use a turn-on threshold only while it is open; once conducting
+         it stays closed until the polarity actually reverses. */
+      const on=p.conducting?vAK>=-.05:vAK>=.55;
+      if(on!==!!p.conducting){p.conducting=on;changed=true;}
+    });
+    if(!changed)break;
+    rebuildBranches();V=solveDcNetwork(branches);
+   }
    applySensorSignals(V,R);
   };
   const syncBattery=()=>S().parts.filter(p=>p.type==="BATT").forEach(p=>batteryLiveData(p,branches,V));
@@ -1606,6 +2335,7 @@ function solveAll(){
   const powered=(p,a,b,min)=>!p.damaged&&Math.abs((V[p.id+"."+a]??0)-(V[p.id+"."+b]??0))>=min;
   S().parts.forEach(p=>{if(p.type==="LEDp"){const d=ledLiveData(p,V);p.lit=!p.damaged&&d.voltage>=d.spec.vf*.65&&d.current>.001;}
     if(p.type==="BULB"){const d=bulbLiveData(p,V);p.lit=!p.damaged&&d.voltage>=d.ratedV*.65;}
+    if(p.type==="STARTER")starterLiveData(p,V);
     if(p.type==="RES")resistorLiveData(p,V);
     if(p.type==="BUZZ")p.lit=powered(p,"+","-",8);if(p.type==="BELL")p.lit=powered(p,"A","B",8);if(p.type==="FAN")p.lit=powered(p,"A","B",8);});
   /* ═ กระแสโดยประมาณต่อขา (สำหรับป้าย mA/A บนสายไฟ ให้ดูเหมือนวงจรจริงตามภาพตัวอย่าง) ═
@@ -1616,6 +2346,13 @@ function solveAll(){
     const va=V[a],vb=V[b];if(va===undefined||vb===undefined)return;
     const i=Math.abs(va-vb)/r;if(!isFinite(i))return;
     PIN_I[a]=Math.max(PIN_I[a]||0,i);PIN_I[b]=Math.max(PIN_I[b]||0,i);});
+  /* A grid junction can split one physical conductor into several visual
+     wire segments.  Propagate its solved current estimate through that wire
+     net so every segment is animated only when the circuit is closed. */
+  S().wires.forEach(w=>{
+    const net=wireNodeSet(w.a);let peak=0;net.forEach(node=>{peak=Math.max(peak,Number(PIN_I[node])||0);});
+    if(peak>0){PIN_I[w.a]=Math.max(PIN_I[w.a]||0,peak);PIN_I[w.b]=Math.max(PIN_I[w.b]||0,peak);}
+  });
   return{V,R,topologyChanged};
 }
 
@@ -1633,6 +2370,7 @@ const RANGES=[
  {id:"mA20", lb:"20m", fn:"a",    full:0.02,   dec:2, u:"mA",side:"r"},
  {id:"mA200",lb:"200m",fn:"a",    full:0.2,    dec:1, u:"mA",side:"r"},
  {id:"A10",  lb:"10A", fn:"a10",  full:10,     dec:2, u:"A", side:"r"},
+ {id:"A200", lb:"200A",fn:"a200", full:200,    dec:0, u:"A", side:"r"},
  {id:"BEEP", lb:"•))", fn:"beep", full:0,      dec:0, u:"",  side:"b"},
  {id:"DIODE",lb:"⊳|",  fn:"diode",full:0,      dec:3, u:"V", side:"b"},
  {id:"R200", lb:"200", fn:"ohm",  full:200,    dec:1, u:"Ω", side:"l"},
@@ -1769,7 +2507,7 @@ function buildDMM(){
 function rangeHelp(r){
   return {off:"ปิดเครื่อง",vdc:"วัดแรงดันไฟตรง (DCV)",vac:"วัดแรงดันไฟสลับ (ACV)",
    ohm:"วัดความต้านทาน — ต้องตัดไฟ/ถอดปลั๊กก่อน",a:"วัดกระแส — ต้องต่ออนุกรม",
-   a10:"วัดกระแสสูง ต้องย้ายสายแดงไปรู 10A",beep:"ทดสอบความต่อเนื่อง (มีเสียงบี๊บ)",
+   a10:"วัดกระแสสูง ต้องย้ายสายแดงไปรู 10A",a200:"ย่านกระแสสูง 200A สำหรับตรวจมอเตอร์สตาร์ท (ใช้รู 10A)",beep:"ทดสอบความต่อเนื่อง (มีเสียงบี๊บ)",
    diode:"ทดสอบไดโอด"}[r.fn]+`  |  ย่าน ${r.lb}`;
 }
 
@@ -1805,15 +2543,15 @@ function acRmsAt(red,blk){
   const p=red&&findP(red.split(".")[0]);if(!p)return null;
   const P=p.id+".";
   if(p.type==="AC"&&samePins(red,blk,P+"A",P+"B"))return {v:Math.max(0,+p.val||0),hint:"แรงดัน AC แบบ sine wave (ค่า RMS)"};
-  if(p.type==="CKP_VR"&&samePins(red,blk,P+"S+",P+"S-"))return {v:vrPeak(p.val)/Math.SQRT2,hint:"สัญญาณ CKP-VR แบบ sine wave (ค่า RMS)"};
-  if(p.type==="CKP_HALL"&&samePins(red,blk,P+"SIG",P+"GND"))return {v:2.5,hint:"Hall 0–5 V, duty 50% — ส่วน AC (DC coupling ถูกตัดออก)"};
+  if((p.type==="CKP_VR"||p.type==="CMP_VR")&&samePins(red,blk,P+"S+",P+"S-"))return {v:vrPeak(p.val)*(p.type==="CMP_VR"?.78:1)/Math.SQRT2,hint:`สัญญาณ ${p.type} แบบ sine wave (ค่า RMS)`};
+  if((p.type==="CKP_HALL"||p.type==="CMP_HALL")&&samePins(red,blk,P+"SIG",P+"GND"))return {v:2.5,hint:"Hall 0–5 V, duty 50% — ส่วน AC (DC coupling ถูกตัดออก)"};
   return {v:0,hint:"จุดวัดนี้ไม่มีองค์ประกอบ AC ที่จำลองไว้"};
 }
 function dmmRead(V,R,disc){
   const r=RANGES.find(x=>x.id===dmmRange), red=otherEnd("DMM.RED"), blk=otherEnd("DMM.BLACK");
   if(r.fn==="off") return {txt:"",unit:"",mode:"",hint:"🔌 ลูกบิดอยู่ตำแหน่ง OFF — หมุนไปย่านที่ต้องการวัดก่อน"};
   /* ตรวจรูเสียบ */
-  const needs10A = (r.fn==="a10");
+  const needs10A = (r.fn==="a10"||r.fn==="a200");
   if(needs10A && jackRed!=="10A")
     return {txt:"OL",unit:r.u,mode:"A",hint:"⚠ ย่าน 10A ต้องย้ายสายแดงไปเสียบรู 10A (คลิกที่รูได้เลย)"};
   if(!needs10A && jackRed!=="VΩ")
@@ -1850,7 +2588,7 @@ function dmmRead(V,R,disc){
     return {txt:v.toFixed(0),unit:"Ω",mode,
       hint: v<30 ? "🔔 บี๊บ! วงจรต่อเนื่องดี (ต่ำกว่า 30Ω)" : "🔇 ต่อถึงกันแต่ความต้านทานสูง — ไม่บี๊บ"};
   }
-  else if(r.fn==="a"||r.fn==="a10"){
+  else if(r.fn==="a"||r.fn==="a10"||r.fn==="a200"){
     mode="A";
     const v=pathResistance(R,red,blk);
     if(v===undefined||v===INF) return {txt:"0.00",unit:r.u,mode,hint:"ไม่มีกระแสไหลผ่านจุดนี้"};
@@ -1878,6 +2616,68 @@ function dmmRead(V,R,disc){
    ซึ่งเป็นสาเหตุหนึ่งที่ตัวเลขดูรก/สับสนบนจอ LCD */
 function fmtNum(v,dec){const s=v.toFixed(dec);
   return (parseFloat(s)===0)?(0).toFixed(dec):s;}
+const referenceRowsFor=p=>p?REF.filter(row=>row[0]===p.type&&(p.type!=="APP"||!row[8]||row[8]===appConnector(p))):[];
+const REF_DEFAULT_PROBES={
+ ECT:["SIG","GND"],IAT:["SIG","GND"],TPS:["SIG","GND"],MAP:["SIG","GND"],
+ CKP_HALL:["SIG","GND"],CKP_VR:["S+","S-"],MAF:["MAF","GND"],O2:["Signal+","Signal-"],
+ CMP_HALL:["SIG","GND"],CMP_VR:["S+","S-"],KNOCK:["SIG","GND"],APP:["APS1","GND1"]
+};
+function referenceProbePair(p,row){
+ if(row[7])return row[7];
+ if(p.type==="TPS"&&(row[1].includes("VREF")||row[2]==="R Ω"))return ["VREF","GND"];
+ if((p.type==="CKP_HALL"||p.type==="CMP_HALL")&&row[1].includes("B+"))return ["B+","GND"];
+ if((p.type==="ECT"||p.type==="IAT")&&row[1].includes("กราวด์"))return ["GND","CHASSIS"];
+ return REF_DEFAULT_PROBES[p.type]||[];
+}
+function referenceKind(unit){return unit==="R Ω"?"R":unit==="OL"?"OL":unit==="V"||unit==="VacP"||unit==="Vpp"?"V":unit==="Hz"?"Hz":"";}
+function dmmReferenceValue(reading){
+ const isOl=String(reading?.txt||"").toUpperCase()==="OL";
+ if(isOl)return {kind:"OL",value:Infinity,label:"OL"};
+ const value=Number(reading?.txt);if(!Number.isFinite(value))return null;
+ if(reading.unit==="mV")return {kind:"V",value:value/1000,label:`${reading.txt} mV`};
+ if(reading.unit==="V")return {kind:"V",value,label:`${reading.txt} V`};
+ if(reading.unit==="Ω")return {kind:"R",value,label:`${reading.txt} Ω`};
+ if(reading.unit==="kΩ")return {kind:"R",value:value*1000,label:`${reading.txt} kΩ`};
+ if(reading.unit==="MΩ")return {kind:"R",value:value*1e6,label:`${reading.txt} MΩ`};
+ return null;
+}
+function renderReferencePanel(p){
+ const note=$("note"),body=$("tbl")?.querySelector("tbody"),summary=$("refLiveSummary");if(!note||!body)return;
+ const rows=referenceRowsFor(p);
+ if(!p||!rows.length){note.textContent=p?`💡 ยังไม่มีตารางค่ามาตรฐานสำหรับ ${componentName(p)}`:"💡 เลือกเซ็นเซอร์บน Canvas เพื่อดูค่ามาตรฐานและเทียบค่าที่วัดได้";body.innerHTML="";if(summary)summary.style.display="none";return;}
+ note.textContent=`💡 ${NOTE[p.type]||ELECTRICAL[p.type]||"เลือกเงื่อนไขและวัดตามคู่ขั้วที่ระบุ"}`;
+ const refCell=value=>value===Infinity?"OL":value;
+ body.innerHTML=rows.map((row,index)=>`<tr data-ref-row="${p.id}:${index}"><td>${row[1]}</td><td class="ref-live wait">รอวัด</td><td style="text-align:center">${refCell(row[3])}</td><td style="text-align:center;color:#0a7d3f;font-weight:700">${refCell(row[4])}</td><td style="text-align:center">${refCell(row[5])}</td><td style="color:#6b7784">${row[6]}</td></tr>`).join("");
+ if(summary){summary.style.display="block";summary.style.cssText="font-size:11px;line-height:1.45;margin:0 0 8px;padding:8px;border-radius:7px;background:#f5f7fa;color:#6b7784";summary.textContent="ต่อสายแดง/ดำเข้าคู่ขั้วที่ระบุ แล้วเลือกย่านวัดให้ตรงกับตาราง";}
+}
+function updateReferenceLive(reading){
+ const p=sel&&findP(sel),rows=referenceRowsFor(p),summary=$("refLiveSummary");if(!p||!rows.length)return;
+ const red=otherEnd("DMM.RED"),black=otherEnd("DMM.BLACK"),actual=dmmReferenceValue(reading);
+ let compared=0,passed=0;
+ rows.forEach((row,index)=>{const cell=document.querySelector(`[data-ref-row="${p.id}:${index}"] .ref-live`);if(!cell)return;
+  const pair=referenceProbePair(p,row),match=pair.length===2&&samePins(red,black,p.id+"."+pair[0],p.id+"."+pair[1]),kind=referenceKind(row[2]);
+  cell.className="ref-live wait";
+  /* APP end-stop rows apply only at the corresponding pedal position.  This
+     avoids declaring a healthy 0% signal as bad merely because the 100%
+     reference exists in the same table (and vice versa). */
+  if(p.type==="APP"){
+   const condition=String(row[1]||""),press=Number(p.val)||0,idle=press<=1,wide=press>=99;
+   const idleOnly=(condition.includes("0%")&&!condition.includes("100%"))||condition.includes("ไม่เหยียบ");
+   const wideOnly=condition.includes("100%"),pressedOnly=condition.includes("เหยียบ >1%");
+   if((idleOnly&&!idle)||(wideOnly&&!wide)||(pressedOnly&&idle)){cell.textContent="—";return;}
+  }
+  if(!match){cell.textContent="รอวัด";return;}
+  if(kind==="V"&&row[2]==="Vpp"){cell.textContent="ใช้สโคป";return;}
+  if(kind==="Hz"){cell.textContent="ใช้สโคป";return;}
+  if(!actual||actual.kind!==kind){cell.textContent=kind==="R"?"เลือก Ω / ถอดปลั๊ก":kind==="OL"?"เลือก Ω / ต้องได้ OL":"เลือกย่าน V";return;}
+  compared++;const ok=actual.value>=row[3]-1e-9&&actual.value<=row[5]+1e-9;
+  cell.className="ref-live "+(ok?"ok":"bad");cell.textContent=(ok?"✓ ":"⚠ ")+actual.label;if(ok)passed++;
+ });
+ if(summary){if(!actual){summary.style.background="#f5f7fa";summary.style.color="#6b7784";summary.textContent="ต่อสายแดง/ดำเข้าคู่ขั้วที่ระบุ แล้วเลือกย่านวัดให้ตรงกับตาราง";}
+  else if(compared&&passed>0){summary.style.background="#e7f8ec";summary.style.color="#087a3f";summary.textContent="✓ ค่าที่วัดได้อยู่ในช่วงมาตรฐานของเงื่อนไขที่เลือก";}
+  else if(compared){summary.style.background="#fff0ef";summary.style.color="#b42318";summary.textContent="⚠ ค่าที่วัดได้นอกช่วง — ตรวจอาการเสีย การต่อสาย และย่านวัด";}
+  else {summary.style.background="#f5f7fa";summary.style.color="#6b7784";summary.textContent="ต่อหัววัดให้ตรงคู่ขั้วตามวิธีวัดในตาราง เพื่อเปรียบเทียบอัตโนมัติ";}}
+}
 function updateLCD(){/* ถูกเรียกซ้ำใน loop */}
 
 /* ═══════════════════════════════════════════════════════════
@@ -2006,12 +2806,12 @@ function drawScope(s,ref,lo,hi){
 function sampleScopeSignal(V,red,black,tdivMs){
   const N=800,win=tdivMs/1000*10,p=red&&findP(red.split(".")[0]),base=black?(V[black]??0):0;
   if(!red)return {s:new Array(N).fill(0),ref:new Array(N).fill(0),hz:0,win};
-  if(p&&p.type==="CKP_HALL"&&red===p.id+".SIG"){
+  if(p&&(p.type==="CKP_HALL"||p.type==="CMP_HALL")&&red===p.id+".SIG"){
     const active=running&&wiredOK(p)&&!["OPEN","SHORT_GND","SHORT_BP"].includes(p.fault||"NONE"),ref=waveHall(p.val,N,win).map(v=>v+base),s=active?defect(ref,p.fault):new Array(N).fill(base);
     return {s,ref,hz:active?Math.max(0,+p.val||0):0,win};
   }
-  if(p&&p.type==="CKP_VR"&&red===p.id+".S+"){
-    const active=running&&wiredOK(p)&&!["OPEN","SHORT_GND","SHORT_BP"].includes(p.fault||"NONE"),ref=waveVR(p.val,N,win).map(v=>v+base),s=active?defect(ref,p.fault):new Array(N).fill(base);
+  if(p&&(p.type==="CKP_VR"||p.type==="CMP_VR")&&red===p.id+".S+"){
+    const scale=p.type==="CMP_VR"?.78:1,active=running&&wiredOK(p)&&!["OPEN","SHORT_GND","SHORT_BP"].includes(p.fault||"NONE"),ref=waveVR(p.val,N,win).map(v=>base+v*scale),s=active?defect(ref,p.fault):new Array(N).fill(base);
     return {s,ref,hz:active?Math.max(0,+p.val||0):0,win};
   }
   if(p&&p.type==="AC"&&red===p.id+".A"){
@@ -2037,10 +2837,11 @@ Object.entries(DEF).forEach(([k,d])=>{
  const art=partIcon(sample);art.setAttribute("transform","translate(2,1) scale(1.08)");preview.appendChild(art);
  el.querySelector(".ic").appendChild(preview);
  el.onclick=()=>{document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));
-   arm=k;el.classList.add("arm");stage.style.cursor="crosshair";};
+   wireToolArmed=false;arm=k;el.classList.add("arm");stage.style.cursor="crosshair";updateToolbarStates();};
  $("palette").appendChild(el);});
 Object.entries(FAULTS).forEach(([k,v])=>$("selFault").add(new Option(v,k)));
-$("selFault").onchange=()=>{const p=sel&&findP(sel);if(p&&REQ[p.type])p.fault=$("selFault").value;};
+$("selFault").onchange=()=>{const p=sel&&findP(sel);if(!p||!REQ[p.type])return;
+ snap();p.fault=$("selFault").value;render();};
 function drawThumbs(){
  const t=$("thumbs");t.innerHTML="";
  slides.forEach((s,i)=>{const d=document.createElement("div");
@@ -2059,7 +2860,7 @@ function deleteSlide(i){
  snap();slides.splice(i,1);
  if(i<cur)cur--;
  else if(cur>=slides.length)cur=slides.length-1;
- sel=null;selWire=null;arm=null;wiring=null;drag=null;
+ sel=null;selWire=null;arm=null;wireToolArmed=false;wiring=null;drag=null;
  document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));stage.style.cursor="default";
  render();
 }
@@ -2068,6 +2869,7 @@ $("dupSlide").onclick=()=>{snap();slides.push(JSON.parse(JSON.stringify(S())));c
 $("btnClear").onclick=()=>{snap();slides[cur]={parts:[],wires:[]};sel=null;selWire=null;render();};
 $("btnDel").onclick=()=>{if(sel){snap();delPart(sel);}};
 $("btnUndo").onclick=undo;$("btnRedo").onclick=redo;
+$("btnWireTool").onclick=()=>setWireToolArmed(!wireToolArmed);
 /* 🛠 ซ่อม/เปลี่ยนอุปกรณ์เสีย: ถ้าเลือกชิ้นที่เสียอยู่ จะซ่อมเฉพาะชิ้นนั้น
    ไม่งั้นซ่อม/เปลี่ยนอุปกรณ์ที่เสียหายทั้งหมดในสไลด์ปัจจุบันทีเดียว */
 $("btnRepair").onclick=()=>{
@@ -2099,7 +2901,8 @@ $("btnHelp").onclick=()=>alert(
  "6) ย่าน 10A ต้องคลิกย้ายสายแดงไปรู 10A ก่อน\n"+
  "7) เลือกย่านต่ำเกินไป จอจะขึ้น OL = ต้องเพิ่มย่าน\n"+
  "8) ปุ่ม ▶ จำลองการทำงาน คือสวิตช์เปิด/ปิดไฟเลี้ยงทั้งวงจร (ปุ่มจะสว่างเมื่อเปิดอยู่)\n"+
- "9) ชิ้นส่วนสวิตช์/ปุ่มกด/เบรกเกอร์/ฟิวส์ มีจุดวงกลมเล็กที่มุมขวาบน คลิกเพื่อเปิด-ปิดได้เลย");
+ "9) ชิ้นส่วนสวิตช์/ปุ่มกด/เบรกเกอร์/ฟิวส์ มีจุดวงกลมเล็กที่มุมขวาบน คลิกเพื่อเปิด-ปิดได้เลย\n"+
+ "10) กด 🟡 สายไฟ แล้วลากจากพินหรือรูกริดไปยังปลายทาง; กด Esc เพื่อเลิกใช้เครื่องมือ");
 $("btnToggleDmm").onclick=()=>{dmmVisible=!dmmVisible;render();};
 $("btnToggleScope").onclick=()=>{scopeVisible=!scopeVisible;render();};
 $("btnResetInstr").onclick=()=>{dmmPos={x:40,y:210};scopePos={x:380,y:170};render();};
@@ -2148,6 +2951,7 @@ else mobileLayoutQuery.addListener(syncMobilePanels);
 syncMobilePanels();
 
 function pinLabel(pid){if(!pid)return"—";
+ if(isGridNode(pid)){const p=gridNodePos(pid);return `จุดกริด (${p.x}, ${p.y})`;}
  if(pid==="CHASSIS")return"ตัวถัง (CHASSIS)";if(pid==="BATT+")return"แบต +";
  const[i,pn]=pid.split(".");const p=findP(i);if(!p)return pid;
  const pn2=pinsFor(p).find(x=>x[0]===pn);
@@ -2209,28 +3013,50 @@ function updateStatus(){
 }
 function buildInspector(){
  const box=$("inspector"),p=sel&&findP(sel);
+ if(inspectorEdit&&(!p||inspectorEdit.partId!==p.id))inspectorEdit=null;
  if(!p){box.innerHTML=`<div class="t">คุณสมบัติชิ้นส่วน</div>
    <div style="font-size:11.5px;color:#6b7784;line-height:1.6">
    คลิกเลือกชิ้นส่วนบนแผงวงจร เพื่อปรับค่าจำลอง เช่น อุณหภูมิ / คันเร่ง / รอบเครื่อง / ความต้านทาน</div>`;
-  $("note").textContent="เลือกชิ้นส่วนเพื่อดูค่ามาตรฐาน";
-  $("tbl").querySelector("tbody").innerHTML="";return;}
+  renderReferencePanel(null);return;}
  let html=`<div class="t">${DEF[p.type].ic} ${componentName(p)}
    <span style="color:#8b949e">(${p.id})</span></div>`;
  if(ELECTRICAL[p.type])html+=`<div style="font-size:11px;color:#5c6874;line-height:1.45;margin:-2px 0 8px">⚡ ${ELECTRICAL[p.type]}</div>`;
- if(CTRL[p.type]&&p.type!=="RES"){
-  const[nm,lo,hi,,u]=CTRL[p.type];
-  html+=`<div class="fld"><label>${nm}</label>
-   <input type="range" id="sld" min="${lo}" max="${hi}" value="${p.val}">
-   <b id="sv" style="width:66px;text-align:right;font-family:Consolas">${p.val} ${u}</b></div>
-   <div class="fld"><label>ค่าตรง ๆ</label>
-   <input type="number" id="numV" min="${lo}" max="${hi}" step="any" value="${p.val}"
-    style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas">
-   <b style="width:auto;color:#6b7784">${u}</b></div>`;
+ html+=renderUniversalPropertyEditor(p);
+ if(p.type==="APP"){
+  const connector=appConnector(p),fault=appFault(p),signalPins=appSignalPins(p),limp=!!p.appLimpMode;
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">ปลั๊กและสัญญาณ APP คู่</div>
+   <div class="fld"><label>ชนิดปลั๊ก</label><select id="appConnector"><option value="6" ${connector==="6"?"selected":""}>แบบมาตรฐาน 6 พิน</option><option value="9" ${connector==="9"?"selected":""}>แบบ 9 พิน (มี IVS)</option></select></div>
+   <div style="font-size:10.5px;color:#5c6874;line-height:1.55;margin:-2px 0 7px">${connector==="9"?"APP1/APP2 พร้อม IDLE (IVS), GND-I และ NC/Shield":"APS1/APS2 แบบสัญญาณคู่"}<br>Signal 1: <b id="appAps1">${fmtV(p.aps1Voltage||.8)}</b> • Signal 2: <b id="appAps2">${fmtV(p.aps2Voltage||.4)}</b> • อัตราส่วน: <b id="appRatio">2.00:1</b></div>
+   <div class="fld"><label>อาการจำลอง</label><select id="appFault">${Object.entries(APP_FAULTS).map(([key,label])=>`<option value="${key}" ${fault===key?"selected":""}>${label}</option>`).join("")}</select></div>
+   <div id="appDtc" style="font-size:10.5px;line-height:1.5;padding:6px 7px;border-radius:6px;background:${limp?"#fff0ef":"#e7f8ec"};color:${limp?"#b42318":"#087a3f"}">${limp?`⚠ Limp Home: ${p.appDtc||"ตรวจพบสัญญาณ APP ผิดปกติ"}`:"✓ APP1/APP2 สัมพันธ์กันปกติ — ECU พร้อมรับสัญญาณ"}</div></div>`;
  }
  if(p.type==="DIODE"){
   html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">การจัดวางไดโอด 1N4007</div>
    <div style="font-size:11px;color:#5c6874;line-height:1.55">ปลายดำ = A (Anode) • แถบเงิน = K (Cathode)<br>มุมปัจจุบัน: <b>${diodeRotation(p)}°</b></div>
    <button class="tb" id="btnRotateDiode" type="button" style="margin-top:7px;padding:5px 8px">↻ หมุน 45°</button></div>`;
+ }
+ if(p.type==="IGN"){
+  const stage=ignitionStage(p);
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">ตำแหน่งสวิตช์กุญแจ</div>
+   <div class="fld"><label>ตำแหน่ง</label><select id="ignitionStage"><option value="LOCK" ${stage==="LOCK"?"selected":""}>LOCK / OFF</option><option value="ACC" ${stage==="ACC"?"selected":""}>ACC</option><option value="ON" ${stage==="ON"?"selected":""}>ON / IGN</option><option value="START" ${stage==="START"?"selected":""}>START (สปริงกลับ ON)</option></select></div>
+   <div style="font-size:11px;color:#5c6874;line-height:1.65">สถานะ: <b id="ignitionState" style="color:${stage==="LOCK"?"#c0392b":"#0a7d3f"}">${IGNITION_STAGE_LABEL[stage]}</b><br>
+    ขั้วจ่ายไฟ: <span id="ignitionOutputs">${["ACC","IGN","ST"].filter(pin=>ignitionFeeds(p,pin)).join(" / ")||"—"}</span></div>
+   <div style="display:flex;gap:6px;margin-top:7px"><button class="tb" id="btnIgnitionCycle" type="button" style="padding:5px 8px">↻ หมุนตำแหน่งถัดไป</button><button class="tb" id="btnIgnitionStart" type="button" style="padding:5px 8px">⏻ กดค้าง START</button></div></div>`;
+ }
+ if(p.type==="STARTER"){
+  const mode=starterFault(p),modeMeta=STARTER_FAULTS[mode];
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">มอเตอร์สตาร์ทและโซลีนอยด์</div>
+   <div class="fld"><label>อาการจำลอง</label><select id="starterFault"><option value="NORMAL" ${mode==="NORMAL"?"selected":""}>ปกติ (Normal)</option><option value="CLICK_ONLY" ${mode==="CLICK_ONLY"?"selected":""}>แต๊ก แต่มอเตอร์ไม่หมุน</option><option value="FREE_SPIN" ${mode==="FREE_SPIN"?"selected":""}>หมุนฟรี / Bendix ไม่ขบ</option><option value="JAMMED" ${mode==="JAMMED"?"selected":""}>ติดขัด / Locked Rotor</option><option value="DEAD" ${mode==="DEAD"?"selected":""}>ขดลวดขาด / Dead</option></select></div>
+   <div id="starterFaultDetail" style="font-size:10.5px;color:${mode==="JAMMED"?"#b42318":"#5c6874"};line-height:1.45;margin:-2px 0 7px">${modeMeta.detail}</div>
+   <div class="fld"><label>R โซลีนอยด์</label><input id="starterSolenoidR" type="number" min="0.5" max="2" step="0.1" value="${starterSolenoidResistance(p)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>Ω</b></div>
+   <div class="fld"><label>R มอเตอร์</label><input id="starterMotorR" type="number" min="0.08" max="0.15" step="0.01" value="${starterMotorResistance(p)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>Ω</b></div>
+   <div style="font-size:11px;color:#5c6874;line-height:1.65;border-top:1px solid #eef1f5;padding-top:6px">แรงดัน S (50): <b id="starterSVoltage">${fmtV(p.sVoltage||0)}</b><br>
+    แรงดัน B (30): <b id="starterBVoltage">${fmtV(p.motorVoltage||0)}</b><br>
+    กระแสโซลีนอยด์: <b id="starterSolenoidI">${fmtAmpsLabel(p.solenoidCurrent||0)}</b><br>
+    กระแสมอเตอร์: <b id="starterMotorI">${fmtAmpsLabel(p.motorCurrent||0)}</b><br>
+    รอบหมุน: <b id="starterRpm">${Math.round(p.rpm||0)} rpm</b><br>
+    Bendix: <b id="starterBendix" style="color:${p.solenoidEngaged?"#0a7d3f":"#6b7784"}">${p.solenoidEngaged?"ดันออก / ขบเฟือง":"หดกลับ"}</b><br>
+    สถานะ: <b id="starterState" style="color:${p.overload?"#b42318":p.motorSpinning?"#0a7d3f":"#6b7784"}">${p.overload?"⚠ โหลดเกิน / Locked Rotor":p.motorSpinning?"กำลังหมุน":"รอไฟ S, B และ GND"}</b></div></div>`;
  }
  if(p.type==="BATT"){
   const capValue=batteryCapacityDisplay(p),unit=batteryCapacityUnit(p);
@@ -2307,11 +3133,29 @@ function buildInspector(){
  }
  if(REQ[p.type])html+=`<div style="font-size:11px;color:#6b7784">อาการเสีย: <b>${FAULTS[p.fault||"NONE"]}</b></div>`;
  box.innerHTML=html;
- if($("sld"))$("sld").oninput=e=>{p.val=+e.target.value;$("sv").textContent=p.val+" "+CTRL[p.type][4];
-  if($("numV"))$("numV").value=p.val;};
- if($("numV"))$("numV").addEventListener("change",e=>{
-  const[,lo,hi]=CTRL[p.type];let v=+e.target.value;if(isNaN(v))v=lo;
-  v=Math.max(lo,Math.min(hi,v));p.val=v;render();});
+ bindUniversalPropertyEditor(p);
+ if($("appConnector"))$("appConnector").onchange=e=>{snap();setAppConnector(p,e.target.value);render();};
+ if($("appFault"))$("appFault").onchange=e=>{snap();p.appFault=APP_FAULTS[e.target.value]?e.target.value:"NORMAL";p.appDtcAlerted=false;render();};
+ if($("ignitionStage"))$("ignitionStage").onchange=e=>{snap();setIgnitionStage(p,e.target.value);playUiSound("click");render();};
+ if($("btnIgnitionCycle"))$("btnIgnitionCycle").onclick=()=>{snap();cycleIgnitionStage(p);playUiSound("click");render();};
+ if($("btnIgnitionStart"))$("btnIgnitionStart").onpointerdown=e=>{e.preventDefault();snap();ignitionStartHold=p;setIgnitionStage(p,"START",false);playUiSound("click");render();};
+ if($("starterFault"))$("starterFault").onchange=e=>{snap();p.starterFault=STARTER_FAULTS[e.target.value]?e.target.value:"NORMAL";
+  p.startCommanded=false;p.motorCircuitOn=false;p.motorSpinning=false;p.solenoidEngaged=false;p.cranking=false;p.bendixPosition=0;p.overload=false;p.overloadAlerted=false;render();};
+ if($("starterSolenoidR")&&$("starterMotorR")){
+  const solenoid=$("starterSolenoidR"),motor=$("starterMotorR");
+  const saveStarter=(finish=false)=>{
+   const solRaw=Number(solenoid.value),motorRaw=Number(motor.value);
+   if(!Number.isFinite(solRaw)||!Number.isFinite(motorRaw)){
+    if(finish){solenoid.value=starterSolenoidResistance(p);motor.value=starterMotorResistance(p);}
+    return;
+   }
+   const nextSol=Math.max(.5,Math.min(2,solRaw)),nextMotor=Math.max(.08,Math.min(.15,motorRaw));
+   if(!inspectorEdit&&Math.abs(nextSol-starterSolenoidResistance(p))<1e-9&&Math.abs(nextMotor-starterMotorResistance(p))<1e-9)return;
+   applyInspectorEdit(p,"starter-resistance",()=>{p.solenoidR=nextSol;p.motorR=nextMotor;});
+   if(finish){solenoid.value=nextSol;motor.value=nextMotor;finishInspectorEdit(p,"starter-resistance");}
+  };
+  [solenoid,motor].forEach(el=>{el.addEventListener("input",()=>saveStarter());el.addEventListener("change",()=>saveStarter(true));el.addEventListener("blur",()=>finishInspectorEdit(p,"starter-resistance"));});
+ }
  if($("relayType"))$("relayType").onchange=e=>{
   snap();p.relayType=e.target.value==="SPST"?"SPST":"SPDT";
   /* A four-pin unit has no NC terminal; retain every valid connection. */
@@ -2319,17 +3163,28 @@ function buildInspector(){
   p.energized=false;render();
  };
  if($("battVoltage")){
-  const saveBattery=()=>{const oldSoc=batterySoc(p);snap();
-   p.battVoltage=Math.max(1,Math.min(96,Number($("battVoltage").value)||12));
-   p.battCapacityUnit=$("battUnit").value==="mAh"?"mAh":"Ah";
-   p.battCapacity=Math.max(.01,Number($("battCapacity").value)||(p.battCapacityUnit==="mAh"?45000:45));
-   p.battMaxCurrent=Math.max(.1,Math.min(5000,Number($("battMaxCurrent").value)||400));
-   p.remainingAh=batteryCapacityAh(p)*oldSoc/100;
-   if(p.remainingAh>.000001){p.batteryEmpty=false;p.batteryEmptyAlerted=false;if(S().batteryAlert?.partId===p.id)S().batteryAlert=null;}
-   render();};
-  [$("battVoltage"),$("battCapacity"),$("battMaxCurrent")].forEach(el=>el.onchange=saveBattery);
-  $("battUnit").onchange=()=>{const physicalCapacity=batteryCapacityAh(p),oldSoc=batterySoc(p);snap();
-   p.battCapacityUnit=$("battUnit").value==="mAh"?"mAh":"Ah";p.battCapacity=p.battCapacityUnit==="mAh"?physicalCapacity*1000:physicalCapacity;
+  const voltage=$("battVoltage"),capacity=$("battCapacity"),maxCurrent=$("battMaxCurrent"),unit=$("battUnit");
+  const finiteInput=(el,fallback)=>{const text=el.value.trim(),value=Number(text);return text!==""&&Number.isFinite(value)?value:fallback;};
+  const syncBatteryInputs=()=>{voltage.value=batteryNominalVoltage(p);capacity.value=batteryCapacityDisplay(p);maxCurrent.value=batteryMaxCurrent(p);unit.value=batteryCapacityUnit(p);};
+  const saveBattery=(finish=false)=>{
+   const nextUnit=unit.value==="mAh"?"mAh":"Ah";
+   const nextVoltage=Math.max(1,Math.min(96,finiteInput(voltage,batteryNominalVoltage(p))));
+   const nextCapacity=Math.max(.01,finiteInput(capacity,batteryCapacityDisplay(p)));
+   const nextMax=Math.max(.1,Math.min(5000,finiteInput(maxCurrent,batteryMaxCurrent(p))));
+   const unchanged=nextUnit===batteryCapacityUnit(p)&&Math.abs(nextVoltage-batteryNominalVoltage(p))<1e-9&&Math.abs(nextCapacity-batteryCapacityDisplay(p))<1e-9&&Math.abs(nextMax-batteryMaxCurrent(p))<1e-9;
+   if(!unchanged||inspectorEdit)applyInspectorEdit(p,"battery-settings",()=>{
+    /* Preserve the charge percentage, not an obsolete Ah value, whenever the
+       rated capacity/unit is edited. */
+    if(!Number.isFinite(inspectorEdit.startSoc))inspectorEdit.startSoc=batterySoc(p);
+    p.battVoltage=nextVoltage;p.battCapacityUnit=nextUnit;p.battCapacity=nextCapacity;p.battMaxCurrent=nextMax;
+    p.remainingAh=batteryCapacityAh(p)*inspectorEdit.startSoc/100;
+    if(p.remainingAh>.000001){p.batteryEmpty=false;p.batteryEmptyAlerted=false;if(S().batteryAlert?.partId===p.id)S().batteryAlert=null;}
+   });
+   if(finish){syncBatteryInputs();finishInspectorEdit(p,"battery-settings");}
+  };
+  [voltage,capacity,maxCurrent].forEach(el=>{el.addEventListener("input",()=>saveBattery());el.addEventListener("change",()=>saveBattery(true));el.addEventListener("blur",()=>finishInspectorEdit(p,"battery-settings"));});
+  unit.onchange=()=>{const physicalCapacity=batteryCapacityAh(p),oldSoc=batterySoc(p);finishInspectorEdit(p,"battery-settings");snap();
+   p.battCapacityUnit=unit.value==="mAh"?"mAh":"Ah";p.battCapacity=p.battCapacityUnit==="mAh"?physicalCapacity*1000:physicalCapacity;
    p.remainingAh=physicalCapacity*oldSoc/100;render();};
  if($("battRecharge"))$("battRecharge").onclick=()=>rechargeBattery(p);
  }
@@ -2339,9 +3194,26 @@ function buildInspector(){
    p.resBands=resistorValueToBands(value,p.resBandCount,tolerance);p.resTolerance=p.resBands.at(-1);p.val=resistorBandsToValue(p);render();};
   document.querySelectorAll(".resBand").forEach(el=>el.onchange=e=>{const bands=resistorBandSet(p);snap();bands[Number(e.target.dataset.index)]=e.target.value;
    p.resBands=bands;p.resTolerance=bands.at(-1);p.val=resistorBandsToValue(p);render();});
-  $("resValue").onchange=e=>{const value=Math.max(.01,Math.min(9.99e11,Number(e.target.value)||220)),tolerance=resistorBandSet(p).at(-1);snap();
-   p.resBands=resistorValueToBands(value,p.resBandCount,tolerance);p.resTolerance=p.resBands.at(-1);p.val=resistorBandsToValue(p);render();};
-  $("resRatedW").onchange=e=>{snap();p.ratedW=resistorRatedPower({ratedW:e.target.value});render();};
+  const resValue=$("resValue"),resRatedW=$("resRatedW");
+  const saveResistance=(finish=false)=>{
+   const raw=resValue.value.trim(),parsed=Number(raw);
+   if(raw===""||!Number.isFinite(parsed)){if(finish)resValue.value=resistorResistance(p);return;}
+   const value=Math.max(.01,Math.min(9.99e11,parsed));
+   if(!inspectorEdit&&Math.abs(value-resistorResistance(p))<1e-9){if(finish)resValue.value=value;return;}
+   applyInspectorEdit(p,"resistance",()=>{const tolerance=resistorBandSet(p).at(-1);
+    p.resBands=resistorValueToBands(value,p.resBandCount,tolerance);p.resTolerance=p.resBands.at(-1);p.val=resistorBandsToValue(p);});
+   if(finish){resValue.value=value;finishInspectorEdit(p,"resistance");}
+  };
+  const saveResRatedPower=(finish=false)=>{
+   const raw=resRatedW.value.trim(),parsed=Number(raw);
+   if(raw===""||!Number.isFinite(parsed)){if(finish)resRatedW.value=resistorRatedPower(p);return;}
+   const value=Math.max(.05,Math.min(50,parsed));
+   if(!inspectorEdit&&Math.abs(value-resistorRatedPower(p))<1e-9){if(finish)resRatedW.value=value;return;}
+   applyInspectorEdit(p,"resistor-rating",()=>{p.ratedW=value;});
+   if(finish){resRatedW.value=value;finishInspectorEdit(p,"resistor-rating");}
+  };
+  resValue.addEventListener("input",()=>saveResistance());resValue.addEventListener("change",()=>saveResistance(true));resValue.addEventListener("blur",()=>finishInspectorEdit(p,"resistance"));
+  resRatedW.addEventListener("input",()=>saveResRatedPower());resRatedW.addEventListener("change",()=>saveResRatedPower(true));resRatedW.addEventListener("blur",()=>finishInspectorEdit(p,"resistor-rating"));
  }
   if($("toggleBtn")){
   if(p.type==="PB"){
@@ -2350,21 +3222,21 @@ function buildInspector(){
   }
   if($("ledColor"))$("ledColor").onchange=e=>{snap();p.ledColor=e.target.value;render();};
   if($("bulbRatedV")&&$("bulbRatedW")){
-   const saveBulbRating=()=>{snap();p.ratedV=bulbRatedVoltage({ratedV:$("bulbRatedV").value});
-    p.ratedW=bulbRatedPower({ratedW:$("bulbRatedW").value});render();};
-   $("bulbRatedV").onchange=saveBulbRating;$("bulbRatedW").onchange=saveBulbRating;
+   const ratedV=$("bulbRatedV"),ratedW=$("bulbRatedW");
+   const saveBulbRating=(finish=false)=>{
+    const vRaw=ratedV.value.trim(),wRaw=ratedW.value.trim(),v=Number(vRaw),w=Number(wRaw);
+    if(vRaw===""||wRaw===""||!Number.isFinite(v)||!Number.isFinite(w)){
+     if(finish){ratedV.value=bulbRatedVoltage(p);ratedW.value=bulbRatedPower(p);}return;
+    }
+    const nextV=Math.max(1,Math.min(240,v)),nextW=Math.max(.1,Math.min(1000,w));
+    if(!inspectorEdit&&Math.abs(nextV-bulbRatedVoltage(p))<1e-9&&Math.abs(nextW-bulbRatedPower(p))<1e-9)return;
+    applyInspectorEdit(p,"bulb-rating",()=>{p.ratedV=nextV;p.ratedW=nextW;});
+    if(finish){ratedV.value=nextV;ratedW.value=nextW;finishInspectorEdit(p,"bulb-rating");}
+   };
+   [ratedV,ratedW].forEach(el=>{el.addEventListener("input",()=>saveBulbRating());el.addEventListener("change",()=>saveBulbRating(true));el.addEventListener("blur",()=>finishInspectorEdit(p,"bulb-rating"));});
   }
- if(REQ[p.type]){
-  $("selFault").value=p.fault||"NONE";
-  $("note").textContent="💡 "+NOTE[p.type];
-  $("tbl").querySelector("tbody").innerHTML=REF.filter(r=>r[0]===p.type).map(r=>
-   `<tr><td>${r[1]}</td><td>${r[2]}</td><td style="text-align:center">${r[3]}</td>
-    <td style="text-align:center;color:#0a7d3f;font-weight:700">${r[4]}</td>
-    <td style="text-align:center">${r[5]}</td><td style="color:#6b7784">${r[6]}</td></tr>`).join("");
- } else {
-  $("note").textContent="💡 ใช้มัลติมิเตอร์ (ย่าน Ω/บี๊บ ต้องกดปิดวงจร/ถอดไฟก่อน) เพื่อตรวจสอบชิ้นส่วนนี้";
-  $("tbl").querySelector("tbody").innerHTML="";
-  }
+ if(REQ[p.type])$("selFault").value=p.fault||"NONE";
+ renderReferencePanel(p);
   updateLivePropertyPanel();
 }
 
@@ -2383,6 +3255,24 @@ function updateLivePropertyPanel(){
   set("battRemaining",batteryRemainingDisplay(p));set("battSoc",`${batterySoc(p).toFixed(1)}%`);set("battOcv",fmtV(batteryOpenVoltage(p)));
   const state=$("battState");if(state){state.style.color=batteryIsEmpty(p)?"#b42318":p.currentLimited?"#b54708":"#0a7d3f";
    state.textContent=batteryIsEmpty(p)?"แบตหมด — วงจรถูกตัด":p.currentLimited?"กระแสเกินขีดจำกัด — แรงดันตก":"พร้อมจ่ายไฟ";}
+ }
+ if(p.type==="IGN"){
+  const stage=ignitionStage(p),state=$("ignitionState"),outputs=$("ignitionOutputs");
+  if(state){state.textContent=IGNITION_STAGE_LABEL[stage];state.style.color=stage==="LOCK"?"#c0392b":stage==="START"?"#b54708":"#0a7d3f";}
+  if(outputs)outputs.textContent=["ACC","IGN","ST"].filter(pin=>ignitionFeeds(p,pin)).join(" / ")||"—";
+ }
+ if(p.type==="APP"){
+  const one=Number(p.aps1Voltage)||0,two=Number(p.aps2Voltage)||0,ratio=two>.001?one/two:0,limp=!!p.appLimpMode;
+  set("appAps1",fmtV(one));set("appAps2",fmtV(two));set("appRatio",two>.001?`${ratio.toFixed(2)}:1`:"—");
+  const dtc=$("appDtc");if(dtc){dtc.style.background=limp?"#fff0ef":"#e7f8ec";dtc.style.color=limp?"#b42318":"#087a3f";
+   dtc.textContent=limp?`⚠ Limp Home: ${p.appDtc||"ตรวจพบสัญญาณ APP ผิดปกติ"}`:"✓ APP1/APP2 สัมพันธ์กันปกติ — ECU พร้อมรับสัญญาณ";}
+ }
+ if(p.type==="STARTER"){
+  set("starterSVoltage",fmtV(p.sVoltage||0));set("starterBVoltage",fmtV(p.motorVoltage||0));
+  set("starterSolenoidI",fmtAmpsLabel(p.solenoidCurrent||0));set("starterMotorI",fmtAmpsLabel(p.motorCurrent||0));set("starterRpm",`${Math.round(p.rpm||0)} rpm`);
+  const mode=starterFault(p),detail=$("starterFaultDetail");if(detail){detail.textContent=STARTER_FAULTS[mode].detail;detail.style.color=p.overload?"#b42318":"#5c6874";}
+  const bendix=$("starterBendix");if(bendix){bendix.textContent=p.solenoidEngaged?"ดันออก / ขบเฟือง":"หดกลับ";bendix.style.color=p.solenoidEngaged?"#0a7d3f":"#6b7784";}
+  const state=$("starterState");if(state){state.textContent=p.overload?"⚠ โหลดเกิน / Locked Rotor":p.motorSpinning?(mode==="FREE_SPIN"?"มอเตอร์หมุนฟรี — Bendix ไม่ขบ":"กำลังฉุดสตาร์ท / โซลีนอยด์ดูด"):p.solenoidEngaged?"โซลีนอยด์ทำงาน — มอเตอร์ไม่หมุน":mode==="DEAD"?"วงจรขาด / ไม่ตอบสนอง":"รอไฟ S, B และ GND";state.style.color=p.overload?"#b42318":p.motorSpinning?"#0a7d3f":p.solenoidEngaged?"#b54708":"#6b7784";}
  }
  if(p.type==="RES"){
   const ratio=(Number(p.actualPower)||0)/resistorRatedPower(p);
@@ -2407,17 +3297,60 @@ function updateLivePropertyPanel(){
  }
 }
 
+/* Update only the live layers that change while the simulation runs.  This
+   preserves the focused form field and the panel's scroll position instead of
+   replacing the complete Canvas/Properties DOM dozens of times per second. */
+function updateDynamicCanvas(V){
+ S().wires.forEach((wire,index)=>{const flow=wireL.querySelector(`.wire-flow[data-wire-index="${index}"]`);if(!flow)return;
+  const state=wireState(wire,V);flow.setAttribute("class","wire-flow"+(state.live?" live":"")+(state.reverse?" reverse":""));
+ });
+ S().parts.forEach(p=>{const indicator=partL.querySelector(`.component-live-indicator[data-part-id="${p.id}"]`);if(!indicator)return;
+  const lit=!!p.lit,overload=p.type==="STARTER"&&p.overload;indicator.setAttribute("fill",overload?"#e05252":lit?"#ffe680":"#e3e8ee");indicator.setAttribute("opacity",lit||overload?"1":".7");indicator.setAttribute("stroke",overload?"#b42318":lit?"#ffd400":"#c7cfd8");indicator.setAttribute("stroke-width",lit||overload?"2":"1");
+ });
+ /* Voltage/current changes from a slider or switching action must alter the
+    rendered lamp itself, not merely the small status lamp.  These attributes
+    update in place so the Canvas remains stable while a circuit is live. */
+ S().parts.filter(p=>p.type==="LEDp"||p.type==="BULB").forEach(p=>{
+  const root=partL.querySelector(`g[data-pid="${p.id}"]`);if(!root)return;
+  const set=(selector,attrs)=>{const el=root.querySelector(selector);if(!el)return;Object.entries(attrs).forEach(([key,value])=>el.setAttribute(key,String(value)));};
+  if(p.type==="LEDp"){
+   const spec=ledSpec(p),voltage=Number(p.actualVoltage)||0,brightness=p.damaged||voltage<spec.vf*.65?0:Math.max(0,Math.min(1,(Number(p.actualCurrent)||0)/.020)),fill=p.damaged?"#1c2229":brightness>.001?spec.color:spec.off;
+   set(".led-glow-outer",{r:15+brightness*11,fill:spec.color,opacity:brightness>.001?.05+.17*brightness:0});
+   set(".led-glow-inner",{r:10+brightness*6,fill:spec.color,opacity:brightness>.001?.10+.18*brightness:0});
+   set(".led-body",{fill});set(".led-cathode",{stroke:fill});
+   set(".led-ray-one",{opacity:brightness,"stroke-width":1.2+brightness*1.2});set(".led-ray-two",{opacity:brightness,"stroke-width":1.2+brightness*1.2});
+  }else{
+   const ratio=p.damaged?0:Math.max(0,Math.min(1,(Number(p.actualVoltage)||0)/Math.max(1,bulbRatedVoltage(p)))),powerRatio=p.damaged?0:Math.max(0,Math.min(1,(Number(p.actualPower)||0)/Math.max(.1,bulbRatedPower(p)))),glow=Math.max(ratio*.65,powerRatio),filament=glow<.12?"#8a8468":glow<.45?"#ee6c32":glow<.8?"#ffb21c":"#fff4c2";
+   set(".bulb-glow",{r:10+glow*11,fill:filament,opacity:glow>.02?.06+.17*glow:0});
+   set(".bulb-glass",{fill:p.damaged?"#252a30":glow>.02?filament:"#e9e6d8"});set(".bulb-filament",{stroke:p.damaged?"#77808a":filament,"stroke-width":1+glow});set(".bulb-lit-glow",{opacity:p.lit?.35:0});
+  }
+ });
+ const now=performance.now();
+ S().parts.filter(p=>p.type==="STARTER").forEach(p=>{
+  const rotor=partL.querySelector(`.starter-rotor[data-part-id="${p.id}"]`),bendix=partL.querySelector(`.starter-bendix[data-part-id="${p.id}"]`),solenoid=partL.querySelector(`.starter-solenoid[data-part-id="${p.id}"]`);
+  if(rotor)rotor.setAttribute("transform",`rotate(${p.motorSpinning?(now*(p.rpm||0)*.006)%360:0} 4 16)`);
+  if(bendix)bendix.setAttribute("transform",`translate(${(Number(p.bendixPosition)||0)*5} 0)`);
+  if(solenoid)solenoid.setAttribute("fill",p.solenoidEngaged?"#d49117":"#a8792d");
+ });
+}
+
 /* ═══════════════════════════════════════════════════════════
    ขั้นที่ 9 : วนอัปเดตเรียลไทม์
    ═══════════════════════════════════════════════════════════ */
-let lastDynamicCanvasRender=0;
 function loop(){
  const {V,R,topologyChanged}=solveAll();
- const dynamicVisuals=S().parts.some(p=>p.type==="AC"||p.type==="LEDp"||p.type==="BULB");
- if(topologyChanged||(dynamicVisuals&&performance.now()-lastDynamicCanvasRender>66)){lastDynamicCanvasRender=performance.now();render();}
+ const editingProperties=inspectorInteractionActive(),canvasInteraction=!!wireDrag||!!wiring||!!drag;
+ /* Do not rebuild the whole SVG on every animation frame.  Recreating the
+    dashed-current paths repeatedly restarted their CSS animation and made a
+    completed circuit appear to pulse or run erratically.  Live layers below
+    update in place; render() is reserved for an actual topology/state change. */
+ updateDynamicCanvas(V);
+ if(topologyChanged&&!editingProperties&&!canvasInteraction)render();
  syncBuzzerAudio(V);
+ syncStarterAudio();
  updateLivePropertyPanel();
  const rd=dmmRead(V,R,$("chkDisc").checked);
+ updateReferenceLive(rd);
  const lv=document.getElementById("lcdVal"),lu=document.getElementById("lcdUnit"),
        lm=document.getElementById("lcdMode");
  if(lv){lv.textContent=rd.txt;lu.textContent=rd.unit;lm.textContent=rd.mode;
@@ -2463,6 +3396,10 @@ bindZoomButton($("btnZoomIn"),()=>zoomByStep(1));
 bindZoomButton($("zoomPct"),()=>resetZoomCenter());
 $("btnAudio").addEventListener("click",()=>setAudioEnabled(!audioEnabled));
 updateAudioButton();
+$("canvasTheme")?.addEventListener("change",e=>applyCanvasTheme(e.target.value));
+$("btnDark")?.addEventListener("click",()=>setNightMode(!document.body.classList.contains("night-mode")));
+applyCanvasTheme(readPreference(THEME_PREF_KEY,"perfboard"),false);
+setNightMode(readPreference(NIGHT_PREF_KEY,"0")==="1",false);
 
 /* Scroll only the workspace: wheel = vertical, Shift+wheel = horizontal.
    Hold Ctrl while using the wheel when zooming around the pointer is wanted. */
