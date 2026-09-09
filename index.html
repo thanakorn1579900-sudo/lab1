@@ -402,8 +402,10 @@ body.night-mode .mobile-panel-close,body.night-mode #mobilePanelActions button{b
     <div class="pane on" id="pane-dmm">
       <div style="font-size:11.5px;color:#4a5560;background:#fff;border:1px solid #dfe5ec;
         border-radius:8px;padding:9px;margin-bottom:9px;line-height:1.6">
-        🖱 มิเตอร์ลอยอยู่บนแผงวงจร <b>ลากที่ตัวเครื่อง</b>เพื่อย้ายตำแหน่ง แล้ว
-        <b>ลากจากหัวสายแดง/ดำ</b> ไปยังขาอุปกรณ์ที่ต้องการวัดได้เลย</div>
+        🖱 <b>KYORITSU MODEL 1009</b> ลอยอยู่บนแผงวงจร — ลากที่ตัวเครื่องเพื่อย้ายตำแหน่ง
+        และลากจากหัวสายแดง/ดำไปยังขาที่ต้องการวัดได้เลย<br>
+        <b>V Ω Hz</b>: แรงดัน/โอห์ม/ไดโอด/ความถี่ • <b>mA / 10A</b>: ต้องตัดสายเดิมแล้วต่ออนุกรม
+        (คีบขนานแบตเตอรี่จะทำให้ฟิวส์มิเตอร์ขาด)</div>
       <div id="hint"></div>
       <div id="probeStat" style="font-size:11.5px;color:#4a5560;background:#fff;
         border:1px solid #dfe5ec;border-radius:8px;padding:9px;margin:9px 0;line-height:1.8"></div>
@@ -1071,7 +1073,8 @@ function preloadAudioAssets(ctx){
   click:makeAudioBuffer(ctx,.07,(t,n)=>(Math.random()*2-1)*Math.exp(-t*55)*.32+Math.sin(t*2*Math.PI*1700)*Math.exp(-t*48)*.18),
   solenoid:makeAudioBuffer(ctx,.09,(t,n)=>((Math.random()*2-1)*.35+Math.sin(t*2*Math.PI*(1350-380*n))*.42)*Math.exp(-t*42)),
   fault:makeAudioBuffer(ctx,.20,(t,n)=>((Math.random()*2-1)*.50+Math.sin(t*2*Math.PI*(260-150*n))*.45)*Math.exp(-t*18)),
-  alert:makeAudioBuffer(ctx,.26,(t,n)=>(Math.sin(t*2*Math.PI*(t<.12?880:1320))*.28)*Math.exp(-t*7))
+  alert:makeAudioBuffer(ctx,.26,(t,n)=>(Math.sin(t*2*Math.PI*(t<.12?880:1320))*.28)*Math.exp(-t*7)),
+  beep:makeAudioBuffer(ctx,.11,(t,n)=>Math.sin(t*2*Math.PI*2150)*.23*Math.min(1,t*90)*Math.max(0,1-t*8))
  };
  return audioAssets;
 }
@@ -2510,6 +2513,10 @@ function solveAll(){
   topologyChanged=advanceSimulation();
   const branches=[];const rebuildBranches=()=>{R={};branches.length=0;const add=([a,b,r])=>{R[k2(a,b)]=r;branches.push([a,b,r]);};
     S().parts.forEach(p=>{componentBranches(p).forEach(add);sensorBranches(p).forEach(add);});
+    /* ย่านกระแสของ KYORITSU เป็น shunt ภายในที่เชื่อม RED → COM จริง
+       ผู้ใช้จึงต้องตัดสายเดิมแล้วเสียบมิเตอร์อนุกรม; ถ้าคีบขนานแหล่งจ่าย
+       กระแสสูงจะวิ่งผ่าน shunt และ logic ฟิวส์ของมิเตอร์จะทำงาน */
+    if(dmmCurrentInputReady())add(["DMM.RED","DMM.BLACK",dmmCurrentShuntResistance()]);
     /* ECU มี pull-up 2.2 kΩ สำหรับ thermistor inputs */
     const ecu0=S().parts.find(x=>x.type==="ECU");if(ecu0&&componentEnabled(ecu0)){add([ecu0.id+".VREF",ecu0.id+".SIG-A",RPULL]);add([ecu0.id+".VREF",ecu0.id+".SIG-D",RPULL]);}};
   const stabilize=()=>{
@@ -2592,24 +2599,25 @@ const RANGES=[
  {id:"V~1000",lb:"1000",fn:"vac", full:1000,   dec:0, u:"V", side:"r"},
  {id:"V~600",lb:"600", fn:"vac",  full:600,    dec:1, u:"V", side:"r"},
  {id:"V~200",lb:"200", fn:"vac",  full:200,    dec:1, u:"V", side:"r"},
+ {id:"V1000",lb:"1000",fn:"vdc",  full:1000,   dec:0, u:"V", side:"tl"},
+ {id:"V600", lb:"600", fn:"vdc",  full:600,    dec:1, u:"V", side:"tl"},
+ {id:"V20",  lb:"20",  fn:"vdc",  full:20,     dec:2, u:"V", side:"l"},
+ {id:"V2",   lb:"2",   fn:"vdc",  full:2,      dec:3, u:"V", side:"l"},
+ {id:"V200m",lb:"200m",fn:"vdc",  full:0.2,    dec:1, u:"mV",side:"l"},
+ {id:"R2M",  lb:"2M",  fn:"ohm",  full:2000000,dec:2, u:"MΩ",side:"l"},
+ {id:"R200k",lb:"200k",fn:"ohm",  full:200000, dec:0, u:"kΩ",side:"l"},
+ {id:"R20k", lb:"20k", fn:"ohm",  full:20000,  dec:0, u:"kΩ",side:"l"},
+ {id:"R2k",  lb:"2k",  fn:"ohm",  full:2000,   dec:0, u:"Ω", side:"l"},
+ {id:"R200", lb:"200", fn:"ohm",  full:200,    dec:1, u:"Ω", side:"l"},
+ {id:"BEEP", lb:"•))", fn:"beep", full:0,      dec:0, u:"",  side:"b"},
+ {id:"DIODE",lb:"⊳|",  fn:"diode",full:0,      dec:3, u:"V", side:"b"},
+ {id:"CAP",  lb:"-||-",fn:"cap", full:4700,    dec:1, u:"µF",side:"b"},
+ {id:"HZ",   lb:"Hz",  fn:"hz",  full:10000,   dec:0, u:"Hz",side:"b"},
  {id:"uA200",lb:"200µ",fn:"a",    full:0.0002, dec:1, u:"µA",side:"r"},
  {id:"mA2",  lb:"2m",  fn:"a",    full:0.002,  dec:3, u:"mA",side:"r"},
  {id:"mA20", lb:"20m", fn:"a",    full:0.02,   dec:2, u:"mA",side:"r"},
  {id:"mA200",lb:"200m",fn:"a",    full:0.2,    dec:1, u:"mA",side:"r"},
- {id:"A10",  lb:"10A", fn:"a10",  full:10,     dec:2, u:"A", side:"r"},
- {id:"A200", lb:"200A",fn:"a200", full:200,    dec:0, u:"A", side:"r"},
- {id:"BEEP", lb:"•))", fn:"beep", full:0,      dec:0, u:"",  side:"b"},
- {id:"DIODE",lb:"⊳|",  fn:"diode",full:0,      dec:3, u:"V", side:"b"},
- {id:"R200", lb:"200", fn:"ohm",  full:200,    dec:1, u:"Ω", side:"l"},
- {id:"R2k",  lb:"2k",  fn:"ohm",  full:2000,   dec:0, u:"Ω", side:"l"},
- {id:"R20k", lb:"20k", fn:"ohm",  full:20000,  dec:0, u:"kΩ",side:"l"},
- {id:"R200k",lb:"200k",fn:"ohm",  full:200000, dec:0, u:"kΩ",side:"l"},
- {id:"R2M",  lb:"2M",  fn:"ohm",  full:2000000,dec:2, u:"MΩ",side:"l"},
- {id:"V200m",lb:"200m",fn:"vdc",  full:0.2,    dec:1, u:"mV",side:"l"},
- {id:"V2",   lb:"2",   fn:"vdc",  full:2,      dec:3, u:"V", side:"l"},
- {id:"V20",  lb:"20",  fn:"vdc",  full:20,     dec:2, u:"V", side:"l"},
- {id:"V600", lb:"600", fn:"vdc",  full:600,    dec:1, u:"V", side:"tl"},
- {id:"V1000",lb:"1000",fn:"vdc",  full:1000,   dec:0, u:"V", side:"tl"}
+ {id:"A10",  lb:"10A", fn:"a10",  full:10,     dec:2, u:"A", side:"r"}
 ];
 /* ═ แก้บัค: เดิมตำแหน่งองศาของป้ายย่านวัดรอบลูกบิด (a:...) ถูกกำหนดมาแบบไม่
    เท่ากัน บางคู่ห่างกันแค่ ~2.5° (เช่น V200m กับ V600) ทำให้ตัวเลขบนหน้าปัด
@@ -2618,12 +2626,16 @@ const RANGES=[
 RANGES.forEach((r,i)=>{r.a=i*(320/(RANGES.length-1));});
 
 let dmmRange="V20";            // ย่านที่เลือกอยู่
-let jackRed="VΩ";              // รูที่เสียบสายแดง : "VΩ" | "10A"
+let jackRed="VΩ";              // รูที่เสียบสายแดง : "VΩ" | "mA" | "10A"
+let dmmAutoRange=true,dmmHold=false,dmmHeldReading=null,dmmRelative=false,dmmRelativeBaseline=null;
+let dmmHzDuty=false,dmmCurrentAc=false,dmmMilliFuseBlown=false,dmmTenAFuseBlown=false,dmmLowBattery=false;
+let dmmHoldPressTimer=null,dmmHoldWasLong=false,dmmContinuityToneAt=0,dmmAcHistory={key:"",samples:[]};
 let dmmPos={x:40,y:210}, scopePos={x:380,y:170};
 let dmmVisible=true, scopeVisible=true;
 let activeCh="CH1";
 const DMM_S=0.62;                       // สเกลย่อของตัวมิเตอร์บนแผงวงจร
-const DMM_JACKS={ "10A":{x:80,y:378}, "COM":{x:150,y:378}, "VΩ":{x:220,y:378} };
+const DMM_JACKS={ "10A":{x:54,y:378}, "mA":{x:112,y:378}, "COM":{x:170,y:378}, "VΩ":{x:228,y:378} };
+const DMM_SHUNT_MA=1.2,DMM_SHUNT_10A=.02;
 function dmmJackPos(id){const c=DMM_JACKS[id]||DMM_JACKS.VΩ;
   return{x:dmmPos.x+c.x*DMM_S,y:dmmPos.y+c.y*DMM_S};}
 
@@ -2634,72 +2646,86 @@ function buildDMM(){
   host.setAttribute("transform",`translate(${dmmPos.x},${dmmPos.y}) scale(${DMM_S})`);
   host.style.display=dmmVisible?"":"none";
   const dmmSvg=host;
-  /* ตัวเรือนเหลือง — ลากตรงนี้เพื่อย้ายมิเตอร์ */
-  const body=mk("rect",{x:14,y:14,width:272,height:442,rx:30,fill:"#f7c600",
-    stroke:"#c99a05","stroke-width":3,class:"instrBody"});
+  /* KYORITSU MODEL 1009 — ยางหุ้ม teal และหน้าปัดสีเทาเข้ม */
+  const body=mk("rect",{x:14,y:14,width:272,height:442,rx:30,fill:"#16858b",
+    stroke:"#0b4f55","stroke-width":3,class:"instrBody"});
   body.dataset.instr="DMM";dmmSvg.appendChild(body);
+  /* ขอบยางหนาและแถบสะท้อนแสง ให้ทรงใกล้ตัวเครื่องจริง */
+  dmmSvg.appendChild(mk("path",{d:"M42 28 Q23 50 25 235 Q23 420 49 443",fill:"none",stroke:"#4cc4c7","stroke-width":8,opacity:.72,"stroke-linecap":"round"}));
+  dmmSvg.appendChild(mk("path",{d:"M258 28 Q278 55 276 235 Q278 416 252 444",fill:"none",stroke:"#0d686d","stroke-width":7,opacity:.8,"stroke-linecap":"round"}));
   /* ยางกันกระแทกมุมเครื่อง */
   [[24,24],[276,24],[24,442],[276,442]].forEach(([bx,by])=>
    dmmSvg.appendChild(mk("rect",{x:bx-13,y:by-13,width:26,height:26,rx:8,
-    fill:"#2b2b2b",opacity:.85})));
-  /* หน้าปัดดำ */
-  dmmSvg.appendChild(mk("rect",{x:36,y:36,width:228,height:398,rx:16,fill:"#2b2b2b"}));
-  dmmSvg.appendChild(mk("text",{x:150,y:30,"text-anchor":"middle","font-size":11,
-    "font-weight":700,fill:"#3a2e00"},"DIGITAL MULTIMETER"));
+    fill:"#0b4f55",opacity:.85})));
+  /* หน้าปัดและตรายี่ห้อ */
+  dmmSvg.appendChild(mk("rect",{x:36,y:36,width:228,height:398,rx:16,fill:"#303942"}));
+  dmmSvg.appendChild(mk("text",{x:52,y:31,"font-size":14,"font-weight":800,fill:"#eef9f8", "letter-spacing":1},"KYORITSU"));
+  dmmSvg.appendChild(mk("text",{x:247,y:30,"text-anchor":"end","font-size":7.5,
+    "font-weight":700,fill:"#b9d8d7"},"MODEL 1009 • 4000 COUNT"));
   /* จอ LCD — ขยายกรอบ + จัดตำแหน่ง mode/unit/ค่า ให้ห่างกันชัดเจน ไม่ทับซ้อน
      (ขนาดตัวเลขจะถูกย่ออัตโนมัติตามความยาวข้อความใน updateLCDText()) */
-  dmmSvg.appendChild(mk("rect",{x:48,y:50,width:204,height:94,rx:10,fill:"#dfe9e0",
+  dmmSvg.appendChild(mk("rect",{x:48,y:50,width:204,height:94,rx:10,fill:"#c9dccd",
     stroke:"#8f9a90","stroke-width":3}));
-  dmmSvg.appendChild(mk("rect",{x:54,y:56,width:192,height:82,rx:7,fill:"#cfe3d6"}));
-  dmmSvg.appendChild(mk("line",{x1:58,y1:80,x2:242,y2:80,stroke:"#a9beac","stroke-width":1}));
-  dmmSvg.appendChild(mk("text",{id:"lcdMode",x:60,y:73,"font-size":11,
+  dmmSvg.appendChild(mk("rect",{x:54,y:56,width:192,height:82,rx:7,fill:"#dcebdd"}));
+  dmmSvg.appendChild(mk("text",{id:"lcdFlags",x:60,y:69,"font-size":8,
+    "font-weight":700,fill:"#3b4a41"},"AUTO  DC"));
+  dmmSvg.appendChild(mk("text",{id:"lcdStatus",x:240,y:69,"text-anchor":"end","font-size":7.5,
+    "font-weight":700,fill:"#3b4a41"},"APO  ▱"));
+  dmmSvg.appendChild(mk("line",{x1:58,y1:76,x2:242,y2:76,stroke:"#a9beac","stroke-width":1}));
+  dmmSvg.appendChild(mk("text",{id:"lcdMode",x:60,y:88,"font-size":10,
     "font-weight":700,fill:"#3b4a41"},""));
-  dmmSvg.appendChild(mk("text",{id:"lcdUnit",x:236,y:73,"text-anchor":"end",
-    "font-size":13,"font-weight":700,fill:"#3b4a41"},""));
+  dmmSvg.appendChild(mk("text",{id:"lcdUnit",x:236,y:88,"text-anchor":"end",
+    "font-size":11,"font-weight":700,fill:"#3b4a41"},""));
   dmmSvg.appendChild(mk("text",{id:"lcdVal",x:236,y:127,"text-anchor":"end",
     "font-family":"Consolas,monospace","font-size":40,"font-weight":700,fill:"#1c2b22"},""));
+  dmmSvg.appendChild(mk("text",{x:150,y:149,"text-anchor":"middle","font-size":9.5,"font-weight":800,fill:"#e4e9ea","letter-spacing":.6},"DIGITAL MULTIMETER"));
 
-  /* วงลูกบิด */
-  const CX=150,CY=272,RD=54;
-  dmmSvg.appendChild(mk("circle",{cx:CX,cy:CY,r:96,fill:"#333"}));
-  /* ป้ายย่านวัด + พื้นที่คลิก */
-  RANGES.forEach(r=>{
-    const rad=(r.a-90)*Math.PI/180;
-    const lx=CX+Math.cos(rad)*78, ly=CY+Math.sin(rad)*78;
-    const hx=CX+Math.cos(rad)*72, hy=CY+Math.sin(rad)*72;
-    const grp=mk("g",{class:"rng no-drag"}); grp.dataset.rid=r.id;
-    grp.appendChild(mk("circle",{class:"rngHit",cx:hx,cy:hy,r:15,fill:"rgba(0,0,0,0)"}));
-    grp.appendChild(mk("text",{x:lx,y:ly+4,"text-anchor":"middle","font-size":11,
-      "font-weight":700,fill:r.id==="OFF"?"#ff4d4d":(r.id===dmmRange?"#ffd400":"#e8e8e8")},r.lb));
-    /* ขีดบอกตำแหน่ง */
-    const t1={x:CX+Math.cos(rad)*60,y:CY+Math.sin(rad)*60},
-          t2={x:CX+Math.cos(rad)*66,y:CY+Math.sin(rad)*66};
-    grp.appendChild(mk("line",{x1:t1.x,y1:t1.y,x2:t2.x,y2:t2.y,
-      stroke:r.id===dmmRange?"#ffd400":"#777","stroke-width":2}));
-    grp.onpointerup=e=>{e.stopPropagation();dmmRange=r.id;render();};
-    grp.appendChild(mk("title",{},rangeHelp(r)));
-    dmmSvg.appendChild(grp);
+  /* ปุ่มฟังก์ชัน 4 ปุ่มของ Model 1009 */
+  const addButton=(x,label,sub,fill,action)=>{const g=mk("g",{class:"no-drag",style:"cursor:pointer"});
+    g.appendChild(mk("rect",{x:x-23,y:151,width:46,height:27,rx:6,fill,stroke:"#101b1e","stroke-width":1.2}));
+    g.appendChild(mk("text",{x,y:163,"text-anchor":"middle","font-size":7.6,"font-weight":800,fill:fill==="#f5cc33"?"#283238":"#eef7f7"},label));
+    g.appendChild(mk("text",{x,y:173,"text-anchor":"middle","font-size":6.2,fill:fill==="#f5cc33"?"#283238":"#c7dedf"},sub));
+    g.onpointerup=e=>{e.stopPropagation();action();};dmmSvg.appendChild(g);};
+  addButton(64,"SELECT","Ω / •)) / ⊳|","#f5cc33",dmmSelectFunction);
+  addButton(120,"RANGE",dmmAutoRange?"AUTO":"MANUAL","#536a70",dmmToggleRangeMode);
+  addButton(176,"REL","Δ zero","#536a70",dmmToggleRelative);
+  const hold=mk("g",{class:"no-drag",style:"cursor:pointer"});
+  hold.appendChild(mk("rect",{x:209,y:151,width:46,height:27,rx:6,fill:"#536a70",stroke:"#101b1e","stroke-width":1.2}));
+  hold.appendChild(mk("text",{x:232,y:163,"text-anchor":"middle","font-size":7.6,"font-weight":800,fill:"#eef7f7"},"HOLD"));
+  hold.appendChild(mk("text",{x:232,y:173,"text-anchor":"middle","font-size":6.2,fill:"#c7dedf"},"Hz / DUTY"));
+  hold.onpointerdown=dmmHoldPointerDown;hold.onpointerup=dmmHoldPointerUp;hold.onpointercancel=dmmHoldPointerCancel;dmmSvg.appendChild(hold);
+
+  /* หน้าปัดหมุนแบบพัดสีฟ้า/เหลืองตาม Model 1009 */
+  const CX=150,CY=272,RD=55;
+  dmmSvg.appendChild(mk("circle",{cx:CX,cy:CY,r:93,fill:"#1c2227",stroke:"#111619","stroke-width":2}));
+  dmmSvg.appendChild(mk("text",{x:CX,y:183,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#d5dde0"},"Auto Power OFF"));
+  dmmSvg.appendChild(mk("text",{x:45,y:CY+24,"text-anchor":"middle","font-size":10,"font-weight":800,fill:"#e9eff0"},"OFF"));
+  dmmSvg.appendChild(mk("text",{x:255,y:CY+24,"text-anchor":"middle","font-size":10,"font-weight":800,fill:"#e9eff0"},"OFF"));
+  DMM_SELECTOR_SEGMENTS.forEach((seg,index)=>{
+    const start=192+index*20+1,end=start+18,active=dmmSelectorMode()===seg.mode;
+    const group=mk("g",{class:"rng no-drag",style:"cursor:pointer"});
+    group.appendChild(mk("path",{d:annularSector(CX,CY,63,91,start,end),fill:active?"#f9d43d":seg.fill,stroke:"#1d2d33","stroke-width":1.4}));
+    const mid=(start+end)/2*Math.PI/180,tx=CX+77*Math.cos(mid),ty=CY+77*Math.sin(mid),lines=seg.label.split("\n");
+    lines.forEach((line,i)=>group.appendChild(mk("text",{x:tx,y:ty+(i-(lines.length-1)/2)*10+4,"text-anchor":"middle","font-size":lines.length>1?8.5:15,"font-weight":800,fill:"#17252a"},line)));
+    group.onpointerup=e=>{e.stopPropagation();dmmSetRange(seg.range);};
+    group.appendChild(mk("title",{},`เลือกย่าน ${seg.label.replaceAll("\n"," / ")}`));dmmSvg.appendChild(group);
   });
-  /* กลุ่มหมวดหมู่ */
-  dmmSvg.appendChild(mk("text",{x:CX,y:CY-92,"text-anchor":"middle","font-size":10,fill:"#9a9a9a"},"V~ / OFF / V~"));
-  dmmSvg.appendChild(mk("text",{x:CX-88,y:CY+8,"text-anchor":"middle","font-size":11,
-    "font-weight":700,fill:"#bdbdbd"},"Ω"));
-  dmmSvg.appendChild(mk("text",{x:CX+90,y:CY+8,"text-anchor":"middle","font-size":11,
-    "font-weight":700,fill:"#bdbdbd"},"A"));
-  /* ลูกบิด */
+  /* ลูกบิดมีคันโยกยาวแบบตัวจริง; หมุนตามกลุ่มย่านวัดที่เลือก */
   const kn=mk("g",{});
-  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:RD,fill:"#6e6e6e",stroke:"#3a3a3a","stroke-width":3}));
-  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:RD-10,fill:"#8a8a8a"}));
-  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:14,fill:"#5c5c5c"}));
-  const R0=RANGES.find(x=>x.id===dmmRange);
-  kn.setAttribute("transform",`rotate(${R0.a} ${CX} ${CY})`);
-  kn.appendChild(mk("rect",{x:CX-7,y:CY-RD+2,width:14,height:24,rx:3,fill:"#e53935"}));
+  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:RD+8,fill:"#1d2226",stroke:"#050708","stroke-width":2}));
+  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:RD,fill:"#52585a",stroke:"#15191b","stroke-width":2}));
+  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:RD-7,fill:"#34393b"}));
+  kn.setAttribute("transform",`rotate(${dmmSelectorRotation()} ${CX} ${CY})`);
+  kn.appendChild(mk("rect",{x:CX-13,y:CY-76,width:26,height:88,rx:9,fill:"#202426",stroke:"#080a0b","stroke-width":1.5}));
+  kn.appendChild(mk("ellipse",{cx:CX,cy:CY-65,rx:10,ry:16,fill:"#444a4c",opacity:.8}));
+  kn.appendChild(mk("circle",{cx:CX,cy:CY,r:12,fill:"#2a2f31",stroke:"#101314","stroke-width":1}));
   dmmSvg.appendChild(kn);
 
   /* รูเสียบสายวัด — จุดที่ลากสายไปจับขาอุปกรณ์ได้จริง */
-  const jacks=[{id:"10A",x:80,y:378,lb:"10 A",sub:"FUSED"},
-               {id:"COM",x:150,y:378,lb:"COM",sub:""},
-               {id:"VΩ", x:220,y:378,lb:"VΩ",sub:"max 600V"}];
+  const jacks=[{id:"10A",x:54,y:378,lb:"10A",sub:dmmTenAFuseBlown?"FUSE OPEN":"FUSED"},
+               {id:"mA",x:112,y:378,lb:"mA",sub:dmmMilliFuseBlown?"FUSE OPEN":"500mA F"},
+               {id:"COM",x:170,y:378,lb:"COM",sub:""},
+               {id:"VΩ", x:228,y:378,lb:"V Ω Hz",sub:"CAT III"}];
   jacks.forEach(j=>{
     const grp=mk("g",{class:"jack"});
     grp.appendChild(mk("circle",{cx:j.x,cy:j.y,r:15,fill:"#1b1b1b",stroke:"#555","stroke-width":2}));
@@ -2719,23 +2745,163 @@ function buildDMM(){
       "font-weight":700,fill:"#ddd"},j.lb));
     if(j.sub)grp.appendChild(mk("text",{x:j.x,y:j.y+44,"text-anchor":"middle",
       "font-size":8,fill:"#999"},j.sub));
-    if(j.id==="VΩ")dmmSvg.appendChild(mk("text",{x:j.x,y:j.y+56,"text-anchor":"middle",
-      "font-size":7.5,fill:"#999"},"600V CAT III"));
     if(!isCom){
       const hit=mk("circle",{cx:j.x,cy:j.y-30,r:8,class:"no-drag",fill:"rgba(255,255,255,0)",style:"cursor:pointer"});
-      hit.onpointerup=e=>{e.stopPropagation();jackRed=j.id;render();};
+      hit.onpointerup=e=>{e.stopPropagation();dmmSetJack(j.id);};
       hit.appendChild(mk("title",{},"คลิกเพื่อย้ายสายแดงมาเสียบรูนี้"));
       grp.appendChild(hit);
     }
     dmmSvg.appendChild(grp);
   });
+  const repair=mk("g",{class:"no-drag",style:"cursor:pointer"});
+  repair.appendChild(mk("rect",{x:113,y:423,width:74,height:16,rx:5,fill:"#28545a",stroke:"#0f292d","stroke-width":1}));
+  repair.appendChild(mk("text",{x:150,y:434,"text-anchor":"middle","font-size":7.5,"font-weight":700,fill:"#d8f3f1"},"REPLACE FUSE"));
+  repair.onpointerup=e=>{e.stopPropagation();dmmRepairFuses();};
+  repair.appendChild(mk("title",{},"เปลี่ยนฟิวส์ mA / 10A ของมิเตอร์"));dmmSvg.appendChild(repair);
   updateLCD();
 }
 function rangeHelp(r){
   return {off:"ปิดเครื่อง",vdc:"วัดแรงดันไฟตรง (DCV)",vac:"วัดแรงดันไฟสลับ (ACV)",
    ohm:"วัดความต้านทาน — ต้องตัดไฟ/ถอดปลั๊กก่อน",a:"วัดกระแส — ต้องต่ออนุกรม",
    a10:"วัดกระแสสูง ต้องย้ายสายแดงไปรู 10A",a200:"ย่านกระแสสูง 200A สำหรับตรวจมอเตอร์สตาร์ท (ใช้รู 10A)",beep:"ทดสอบความต่อเนื่อง (มีเสียงบี๊บ)",
-   diode:"ทดสอบไดโอด"}[r.fn]+`  |  ย่าน ${r.lb}`;
+   diode:"ทดสอบไดโอด",cap:"วัดค่าความจุ (ต้องคายประจุก่อน)",hz:"วัดความถี่ / duty cycle"}[r.fn]+`  |  ย่าน ${r.lb}`;
+}
+
+/* หน้าปัดหมุนทรงเดียวกับ KYORITSU 1009 ในภาพอ้างอิง: กลุ่มย่านวัด
+   เรียงเป็น V~, V⎓, Ω/diode/continuity, capacitance, Hz, µA, mA, A */
+const DMM_SELECTOR_SEGMENTS=[
+ {mode:"vac",label:"V~",range:"V~200",fill:"#31a8d4"},
+ {mode:"vdc",label:"V⎓",range:"V20",fill:"#31a8d4"},
+ {mode:"ohm",label:"Ω\n•))\n⊳|",range:"R2k",fill:"#f7c821"},
+ {mode:"cap",label:"-||-",range:"CAP",fill:"#b4bec2"},
+ {mode:"hz",label:"Hz",range:"HZ",fill:"#31a8d4"},
+ {mode:"ua",label:"µA",range:"uA200",fill:"#31a8d4"},
+ {mode:"ma",label:"mA",range:"mA200",fill:"#31a8d4"},
+ {mode:"a",label:"A",range:"A10",fill:"#31a8d4"}
+];
+function dmmSelectorMode(r=RANGES.find(x=>x.id===dmmRange)){
+ if(!r||r.fn==="off")return "off";
+ if(r.fn==="ohm"||r.fn==="beep"||r.fn==="diode")return "ohm";
+ if(r.fn==="a")return r.u==="µA"?"ua":"ma";
+ if(r.fn==="a10"||r.fn==="a200")return "a";
+ return r.fn;
+}
+function dmmSelectorRotation(){
+ const mode=dmmSelectorMode(),index=DMM_SELECTOR_SEGMENTS.findIndex(x=>x.mode===mode);
+ /* คันโยกพื้นฐานชี้ขึ้น; OFF ชี้ซ้าย, กลุ่มอื่นกวาดผ่านครึ่งวงกลมด้านบน */
+ return index<0?-90:-70+index*20;
+}
+function annularSector(cx,cy,inner,outer,start,end){
+ const rad=n=>n*Math.PI/180,point=(r,a)=>[cx+r*Math.cos(rad(a)),cy+r*Math.sin(rad(a))],a=point(outer,start),b=point(outer,end),c=point(inner,end),d=point(inner,start),large=end-start>180?1:0;
+ return `M ${a[0]} ${a[1]} A ${outer} ${outer} 0 ${large} 1 ${b[0]} ${b[1]} L ${c[0]} ${c[1]} A ${inner} ${inner} 0 ${large} 0 ${d[0]} ${d[1]} Z`;
+}
+
+/* ───── KYORITSU 1009 controls, inputs and protection ───── */
+function dmmCurrentRange(r=RANGES.find(x=>x.id===dmmRange)){return !!r&&["a","a10","a200"].includes(r.fn);}
+function dmmExpectedJack(r=RANGES.find(x=>x.id===dmmRange)){
+  if(!dmmCurrentRange(r))return "VΩ";
+  return r.fn==="a10"||r.fn==="a200"?"10A":"mA";
+}
+function dmmFuseIsBlown(jack=jackRed){return jack==="mA"?dmmMilliFuseBlown:jack==="10A"?dmmTenAFuseBlown:false;}
+function dmmCurrentShuntResistance(){return jackRed==="10A"?DMM_SHUNT_10A:DMM_SHUNT_MA;}
+function dmmCurrentFuseLimit(){return jackRed==="10A"?10:.5;}
+function dmmCurrentInputReady(){
+  const r=RANGES.find(x=>x.id===dmmRange),red=otherEnd("DMM.RED"),blk=otherEnd("DMM.BLACK");
+  return dmmVisible&&dmmCurrentRange(r)&&jackRed===dmmExpectedJack(r)&&!dmmFuseIsBlown(jackRed)&&!!red&&!!blk;
+}
+function dmmBlowFuse(jack,reason){
+  if(jack!=="mA"&&jack!=="10A"||dmmFuseIsBlown(jack))return;
+  if(jack==="mA")dmmMilliFuseBlown=true;else dmmTenAFuseBlown=true;
+  dmmHold=false;dmmHeldReading=null;playUiSound("fault");
+  showToast(`⛔ ฟิวส์ ${jack} ของ KYORITSU 1009 ขาด — ${reason}`);render();
+}
+function dmmRepairFuses(){
+  if(!dmmMilliFuseBlown&&!dmmTenAFuseBlown){showToast("ฟิวส์มัลติมิเตอร์ยังปกติ");return;}
+  dmmMilliFuseBlown=false;dmmTenAFuseBlown=false;playUiSound("click");showToast("🛠 เปลี่ยนฟิวส์ mA / 10A แล้ว — พร้อมวัดกระแส");render();
+}
+function dmmSetRange(id,quiet=false){
+  if(!RANGES.some(r=>r.id===id))return;
+  dmmRange=id;dmmHold=false;dmmHeldReading=null;dmmRelativeBaseline=null;
+  if(!quiet)playUiSound("click");render();
+}
+function dmmSetJack(id){
+  if(!DMM_JACKS[id]||id==="COM")return;
+  jackRed=id;dmmHold=false;dmmHeldReading=null;playUiSound("click");render();
+}
+function dmmToggleRangeMode(){dmmAutoRange=!dmmAutoRange;playUiSound("click");showToast(`KYORITSU: ${dmmAutoRange?"Auto Range":"Manual Range"}`);render();}
+function dmmToggleRelative(){
+  dmmRelative=!dmmRelative;dmmRelativeBaseline=null;playUiSound("click");
+  showToast(dmmRelative?"REL Δ: ตั้งค่าปัจจุบันเป็นศูนย์":"REL Δ: ปิด");render();
+}
+function dmmSelectFunction(){
+  const r=RANGES.find(x=>x.id===dmmRange);if(!r)return;
+  if(["ohm","beep","diode"].includes(r.fn)){
+    const next={ohm:"BEEP",beep:"DIODE",diode:"R2k"}[r.fn];dmmSetRange(next);return;
+  }
+  if(r.fn==="vdc"||r.fn==="vac"){
+    const peers=RANGES.filter(x=>x.fn===(r.fn==="vdc"?"vac":"vdc"));
+    const peer=peers.reduce((best,x)=>Math.abs(x.full-r.full)<Math.abs(best.full-r.full)?x:best,peers[0]);
+    dmmSetRange(peer.id);return;
+  }
+  if(dmmCurrentRange(r)){
+    dmmCurrentAc=!dmmCurrentAc;playUiSound("click");showToast(`SELECT: กระแส ${dmmCurrentAc?"AC":"DC"}`);render();return;
+  }
+  playUiSound("click");showToast("SELECT: โหมดนี้ไม่มีฟังก์ชันย่อย");
+}
+function dmmHoldPointerDown(e){
+  e.stopPropagation();dmmHoldWasLong=false;clearTimeout(dmmHoldPressTimer);
+  dmmHoldPressTimer=setTimeout(()=>{dmmHoldWasLong=true;dmmHeldReading=null;
+    if(dmmRange!=="HZ"){dmmHzDuty=false;dmmSetRange("HZ");}
+    else{dmmHzDuty=!dmmHzDuty;playUiSound("click");showToast(`Hz/DUTY: ${dmmHzDuty?"DUTY %":"Hz"}`);render();}
+  },550);
+}
+function dmmHoldPointerUp(e){e.stopPropagation();clearTimeout(dmmHoldPressTimer);if(dmmHoldWasLong)return;
+  dmmHold=!dmmHold;dmmHeldReading=null;playUiSound("click");showToast(dmmHold?"HOLD: ล็อกค่าบนจอ":"HOLD: ปลดล็อก");render();}
+function dmmHoldPointerCancel(e){e.stopPropagation();clearTimeout(dmmHoldPressTimer);}
+function dmmReadingBaseValue(reading){
+  const value=Number(reading?.txt);if(!Number.isFinite(value))return null;
+  return reading.unit==="mV"?value/1000:reading.unit==="mA"?value/1000:reading.unit==="µA"?value/1e6:
+    reading.unit==="kΩ"?value*1000:reading.unit==="MΩ"?value*1e6:value;
+}
+function dmmAutoSelectRange(reading){
+  if(!dmmAutoRange||dmmHold||String(reading?.txt).toUpperCase()==="OL")return false;
+  const current=RANGES.find(x=>x.id===dmmRange);if(!current||!["vdc","vac","ohm","a"].includes(current.fn))return false;
+  const base=dmmReadingBaseValue(reading);if(base===null)return false;
+  const candidates=RANGES.filter(x=>x.fn===current.fn).sort((a,b)=>a.full-b.full);
+  const next=candidates.find(x=>Math.abs(base)<=x.full*.95)||candidates[candidates.length-1];
+  if(!next||next.id===dmmRange)return false;
+  dmmRange=next.id;dmmRelativeBaseline=null;return true;
+}
+function dmmPresentReading(reading){
+  let out={...reading};
+  if(dmmHold){if(!dmmHeldReading)dmmHeldReading={...out};out={...dmmHeldReading,mode:`${dmmHeldReading.mode} HOLD`.trim()};}
+  else dmmHeldReading=null;
+  if(!dmmHold&&dmmRelative){
+    const value=Number(out.txt);
+    if(Number.isFinite(value)){
+      if(!dmmRelativeBaseline||dmmRelativeBaseline.range!==dmmRange||dmmRelativeBaseline.unit!==out.unit)
+        dmmRelativeBaseline={range:dmmRange,unit:out.unit,value};
+      const r=RANGES.find(x=>x.id===dmmRange),delta=value-dmmRelativeBaseline.value;
+      out={...out,txt:fmtNum(delta,r?.dec??2),mode:`${out.mode} REL`.trim(),hint:`REL Δ อ้างอิง ${fmtNum(dmmRelativeBaseline.value,r?.dec??2)} ${out.unit} • ${out.hint}`};
+    }
+  }
+  return out;
+}
+function syncDmmContinuityAudio(reading){
+  const r=RANGES.find(x=>x.id===dmmRange),resistance=Number(reading?.txt);
+  if(r?.fn!=="beep"||!Number.isFinite(resistance)||resistance>=30)return;
+  const now=performance.now();
+  if(now-dmmContinuityToneAt>145){dmmContinuityToneAt=now;playUiSound("beep",.55);}
+}
+function dmmProbeShortsLiveSource(red,blk,V){
+  if(!red||!blk)return false;
+  return electricalSources().some(s=>{
+    const plusNet=wireNodeSet(s.plus),minusNet=wireNodeSet(s.minus);
+    const across=(plusNet.has(red)&&minusNet.has(blk))||(plusNet.has(blk)&&minusNet.has(red));
+    if(!across)return false;
+    const source=findP(s.plus.split(".")[0]);
+    return source?.type==="AC"?Math.max(0,Number(source.val)||0)>.25:Math.abs((V[s.plus]??0)-(V[s.minus]??0))>.25;
+  });
 }
 
 /* ═ แก้บัค: เดิมมิเตอร์วัดโอห์ม/ความต่อเนื่อง/กระแส ได้เฉพาะกรณีจับขาทั้งสอง
@@ -2766,69 +2932,147 @@ function pathResistance(R,a,b){
 }
 /* 6.3 คำนวณค่าที่จะโชว์บนจอ LCD */
 function samePins(a,b,x,y){return (a===x&&b===y)||(a===y&&b===x);}
+/* ใช้ความต่างศักย์ “ที่หัววัดทั้งคู่” เป็นเกณฑ์ความปลอดภัยของย่าน Ω/
+   continuity แทนการบังคับ checkbox กับทุกกรณี: อุปกรณ์ที่ไม่มีไฟเลี้ยง
+   จะวัดบนโต๊ะได้ทันที แต่คู่ขั้วที่มีไฟคร่อมอยู่ยังต้องถอดปลั๊กก่อน */
+function probePairIsLive(V,red,blk){
+  const a=V?.[red],b=V?.[blk];
+  return Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)>.25;
+}
+/* รีเลย์มีขดลวดและหน้าสัมผัสเป็นวงจรภายในที่วัดได้ แม้ยังไม่ได้ต่อสาย
+   ภายนอก การพึ่งพาเฉพาะ graph ของวงจรภายนอกทำให้ DMM ขึ้น OL ในเคสนี้
+   โดยเฉพาะเมื่อผู้เรียนกำลังวัดรีเลย์บนโต๊ะ จึงระบุคู่ขารีเลย์ให้ชัดเจน
+   และคืนค่า R ตามสถานะหน้าสัมผัสจริง (85/86, 30/87, 30/87a) */
+function relayProbePair(red,blk,V){
+  const a=red&&findP(red.split(".")[0]),b=blk&&findP(blk.split(".")[0]);
+  if(!a||a!==b||a.type!=="RELAY")return null;
+  const p=a,P=p.id+".";
+  const live=probePairIsLive(V,red,blk);
+  if(samePins(red,blk,P+"COIL+",P+"COIL-"))return {
+    p,live,kind:"coil",label:"คอยล์รีเลย์ ขา 85–86",resistance:relayCoilResistance(p)
+  };
+  if(samePins(red,blk,P+"COM",P+"NO"))return {
+    p,live,kind:"contact",label:"หน้าสัมผัส ขา 30–87 (NO)",resistance:p.energized ? .02 : INF
+  };
+  if(relayType(p)==="SPDT"&&samePins(red,blk,P+"COM",P+"NC"))return {
+    p,live,kind:"contact",label:"หน้าสัมผัส ขา 30–87a (NC)",resistance:p.energized?INF:.02
+  };
+  return null;
+}
+function relayMeasurementHint(test,beep=false){
+  if(!test)return "";
+  if(test.kind==="coil")return `${test.label}: ค่าปกติประมาณ ${fmtNum(test.resistance,0)} Ω`;
+  const closed=test.resistance!==INF;
+  if(beep)return closed?`🔔 บี๊บ! ${test.label} ต่อถึงกันตามสถานะรีเลย์`:`🔇 ${test.label} วงจรเปิดตามสถานะรีเลย์`;
+  return closed?`${test.label}: หน้าสัมผัสปิด (ความต้านทานต่ำ)`:`${test.label}: หน้าสัมผัสเปิด (OL) ตามสถานะรีเลย์`;
+}
 function acRmsAt(red,blk){
   const p=red&&findP(red.split(".")[0]);if(!p)return null;
   const P=p.id+".";
-  if(p.type==="AC"&&samePins(red,blk,P+"A",P+"B"))return {v:Math.max(0,+p.val||0),hint:"แรงดัน AC แบบ sine wave (ค่า RMS)"};
-  if((p.type==="CKP_VR"||p.type==="CMP_VR")&&samePins(red,blk,P+"S+",P+"S-"))return {v:vrPeak(p.val)*(p.type==="CMP_VR"?.78:1)/Math.SQRT2,hint:`สัญญาณ ${p.type} แบบ sine wave (ค่า RMS)`};
-  if((p.type==="CKP_HALL"||p.type==="CMP_HALL")&&samePins(red,blk,P+"SIG",P+"GND"))return {v:2.5,hint:"Hall 0–5 V, duty 50% — ส่วน AC (DC coupling ถูกตัดออก)"};
-  return {v:0,hint:"จุดวัดนี้ไม่มีองค์ประกอบ AC ที่จำลองไว้"};
+  if(p.type==="AC"&&samePins(red,blk,P+"A",P+"B")){
+    const on=componentEnabled(p)&&!p.damaged;
+    return {v:on?Math.max(0,+p.val||0):0,direct:true,hint:on?"แรงดัน AC แบบ sine wave (ค่า RMS)":"แหล่งจ่าย AC ถูกปิดหรือเสีย — 0 V"};
+  }
+  if((p.type==="CKP_VR"||p.type==="CMP_VR")&&samePins(red,blk,P+"S+",P+"S-"))return {v:vrPeak(p.val)*(p.type==="CMP_VR"?.78:1)/Math.SQRT2,direct:true,hint:`สัญญาณ ${p.type} แบบ sine wave (ค่า RMS)`};
+  if((p.type==="CKP_HALL"||p.type==="CMP_HALL")&&samePins(red,blk,P+"SIG",P+"GND"))return {v:2.5,direct:true,hint:"Hall 0–5 V, duty 50% — ส่วน AC (DC coupling ถูกตัดออก)"};
+  return {v:0,direct:false,hint:"กำลังเก็บตัวอย่างสัญญาณ AC ที่ปลายหัววัด"};
+}
+function sampledAcRms(V,red,blk){
+  const key=`${red||""}|${blk||""}`,now=performance.now(),instant=(V[red]??0)-(V[blk]??0);
+  if(dmmAcHistory.key!==key)dmmAcHistory={key,samples:[]};
+  dmmAcHistory.samples.push({t:now,v:instant});
+  dmmAcHistory.samples=dmmAcHistory.samples.filter(s=>now-s.t<=260);
+  const samples=dmmAcHistory.samples;if(samples.length<4)return 0;
+  const mean=samples.reduce((sum,s)=>sum+s.v,0)/samples.length;
+  return Math.sqrt(samples.reduce((sum,s)=>sum+(s.v-mean)**2,0)/samples.length);
 }
 function dmmRead(V,R,disc){
   const r=RANGES.find(x=>x.id===dmmRange), red=otherEnd("DMM.RED"), blk=otherEnd("DMM.BLACK");
   if(r.fn==="off") return {txt:"",unit:"",mode:"",hint:"🔌 ลูกบิดอยู่ตำแหน่ง OFF — หมุนไปย่านที่ต้องการวัดก่อน"};
-  /* ตรวจรูเสียบ */
-  const needs10A = (r.fn==="a10"||r.fn==="a200");
-  if(needs10A && jackRed!=="10A")
-    return {txt:"OL",unit:r.u,mode:"A",hint:"⚠ ย่าน 10A ต้องย้ายสายแดงไปเสียบรู 10A (คลิกที่รูได้เลย)"};
-  if(!needs10A && jackRed!=="VΩ")
-    return {txt:"OL",unit:r.u,mode:"",hint:"⚠ สายแดงเสียบผิดรู — ย่านนี้ต้องเสียบรู VΩ"};
+  /* ตรวจรูเสียบ 4 ช่องของ Model 1009 */
+  const expectedJack=dmmExpectedJack(r);
+  if(jackRed!==expectedJack)
+    return {txt:"OL",unit:r.u,mode:dmmCurrentRange(r)?"A":"",hint:`⚠ ย่านนี้ต้องย้ายสายแดงไปเสียบรู ${expectedJack} ก่อน`};
+  if(dmmCurrentRange(r)&&dmmFuseIsBlown(jackRed))
+    return {txt:fmtNum(0,r.dec),unit:r.u,mode:"A",hint:`⛔ ฟิวส์ ${jackRed} ขาด — กด REPLACE FUSE ที่ตัวมิเตอร์ก่อนวัดกระแส`};
   if(!red||!blk)
     return {txt:"OL",unit:r.u,mode:"",hint:"⚠ ยังไม่ได้ลากหัวสายแดง/ดำไปจับขาที่ต้องการวัด"};
 
+  const relayTest=relayProbePair(red,blk,V);
   let val=null, hint="", mode="";
   if(r.fn==="vdc"||r.fn==="vac"){
     mode = r.fn==="vdc"?"DC V":"AC V";
-    if(disc) return {txt:"0.00",unit:r.u,mode,hint:"ถอดปลั๊กอยู่ — ฝั่งเซ็นเซอร์ไม่มีแรงดัน"};
     const a=V[red],b=V[blk];
     if(r.fn==="vdc"&&(a===undefined||b===undefined))
       return {txt:"0.00",unit:r.u,mode,hint:"จุดวัดนี้ยังไม่ได้ต่อเข้าวงจร — ตรวจสายไฟก่อน"};
-    if(r.fn==="vac"){const ac=acRmsAt(red,blk);val=ac.v;hint=ac.hint;}
-    else{val=a-b;hint="แรงดัน DC คร่อมจุดวัด (สายแดงเทียบสายดำ)";}
+    if(r.fn==="vac"){const ac=acRmsAt(red,blk);val=ac.direct?ac.v:sampledAcRms(V,red,blk);hint=ac.direct?ac.hint:"ค่า True-RMS ของส่วน AC ที่ปลายหัววัด (ตัด DC offset)";}
+    else{val=a-b;hint=relayTest?.kind==="coil"?"แรงดันเลี้ยงคอยล์รีเลย์ 85–86 (สายแดงเทียบสายดำ)":"แรงดัน DC คร่อมจุดวัด (สายแดงเทียบสายดำ)";}
     if(r.u==="mV") val*=1000;
   }
   else if(r.fn==="ohm"){
     mode="Ω";
-    if(!disc) return {txt:"OL",unit:r.u,mode,
+    /* วัดอุปกรณ์ทุกชนิดที่ไม่มีแรงดันคร่อมได้ทันที; ถ้ามีไฟจริงจึงคง
+       การป้องกันไว้ เว้นแต่ผู้ใช้ติ๊กว่าถอดปลั๊กแล้ว */
+    if(!disc&&probePairIsLive(V,red,blk)) return {txt:"OL",unit:r.u,mode,
       hint:"⚠ ห้ามวัดโอห์มขณะวงจรมีไฟเลี้ยง — ให้ติ๊ก “ถอดปลั๊กเซ็นเซอร์” ก่อน (อาจทำมิเตอร์เสียหาย)"};
-    const v=pathResistance(R,red,blk);
+    const v=relayTest?relayTest.resistance:pathResistance(R,red,blk);
     if(v===undefined) return {txt:"OL",unit:r.u,mode,hint:"จุดวัดคู่นี้ไม่มีความต่อเนื่องถึงกัน"};
-    if(v===INF) return {txt:"OL",unit:r.u,mode,hint:"วงจรขาด หรือเป็น Active Sensor (ปกติได้ OL)"};
-    val=v; hint="อ่านค่าความต้านทานได้ตามปกติ (รวมทุกชิ้นส่วน/สายที่คั่นอยู่)";
+    if(v===INF) return {txt:"OL",unit:r.u,mode,hint:relayMeasurementHint(relayTest)||"วงจรขาด หรือเป็น Active Sensor (ปกติได้ OL)"};
+    val=v; hint=relayMeasurementHint(relayTest)||"อ่านค่าความต้านทานได้ตามปกติ (รวมทุกชิ้นส่วน/สายที่คั่นอยู่)";
     if(r.u==="kΩ")val/=1000; if(r.u==="MΩ")val/=1e6;
   }
   else if(r.fn==="beep"){
     mode="•)) ต่อเนื่อง";
-    if(!disc) return {txt:"OL",unit:"Ω",mode,hint:"⚠ ต้องตัดไฟ/ถอดปลั๊กก่อนทดสอบความต่อเนื่อง"};
-    const v=pathResistance(R,red,blk);
-    if(v===undefined||v===INF) return {txt:"OL",unit:"Ω",mode,hint:"🔇 ไม่ต่อเนื่อง — สายขาด"};
+    if(!disc&&probePairIsLive(V,red,blk)) return {txt:"OL",unit:"Ω",mode,hint:"⚠ ต้องตัดไฟ/ถอดปลั๊กก่อนทดสอบความต่อเนื่อง"};
+    const v=relayTest?relayTest.resistance:pathResistance(R,red,blk);
+    if(v===undefined||v===INF) return {txt:"OL",unit:"Ω",mode,hint:relayMeasurementHint(relayTest,true)||"🔇 ไม่ต่อเนื่อง — สายขาด"};
     return {txt:v.toFixed(0),unit:"Ω",mode,
-      hint: v<30 ? "🔔 บี๊บ! วงจรต่อเนื่องดี (ต่ำกว่า 30Ω)" : "🔇 ต่อถึงกันแต่ความต้านทานสูง — ไม่บี๊บ"};
+      hint: relayMeasurementHint(relayTest,true)||(v<30 ? "🔔 บี๊บ! วงจรต่อเนื่องดี (ต่ำกว่า 30Ω)" : "🔇 ต่อถึงกันแต่ความต้านทานสูง — ไม่บี๊บ")};
   }
   else if(r.fn==="a"||r.fn==="a10"||r.fn==="a200"){
-    mode="A";
-    const v=pathResistance(R,red,blk);
-    if(v===undefined||v===INF) return {txt:"0.00",unit:r.u,mode,hint:"ไม่มีกระแสไหลผ่านจุดนี้"};
-    const dv=Math.abs((V[red]??0)-(V[blk]??0));
-    val=v>0.01?dv/v:0;
-    hint="ค่าประมาณกระแสของแขนงที่เลือก; การวัดจริงต้องตัดวงจรและต่อมิเตอร์อนุกรม";
+    mode=dmmCurrentAc?"AC A":"DC A";
+    /* RED–COM ถูกสร้างเป็น shunt ภายในใน solver เมื่อเสียบเข้ารู mA/10A
+       ค่ากระแสจึงมาจากแรงดันตกคร่อม shunt และใช้ได้เฉพาะการต่ออนุกรม */
+    if(dmmProbeShortsLiveSource(red,blk,V)){
+      dmmBlowFuse(jackRed,"ห้ามคีบขนานข้ามแหล่งจ่ายไฟ");
+      return {txt:fmtNum(0,r.dec),unit:r.u,mode,hint:"⛔ คีบขนานแหล่งจ่าย — ฟิวส์ขาดเพื่อป้องกันมิเตอร์"};
+    }
+    const shunt=dmmCurrentShuntResistance(),dv=Math.abs((V[red]??0)-(V[blk]??0));
+    const instantAmps=shunt>0?dv/shunt:0,amps=dmmCurrentAc?sampledAcRms(V,red,blk)/shunt:instantAmps;
+    if(instantAmps>dmmCurrentFuseLimit()*1.02){
+      dmmBlowFuse(jackRed,`กระแส ${instantAmps.toFixed(2)} A เกินพิกัดฟิวส์`);
+      return {txt:fmtNum(0,r.dec),unit:r.u,mode,hint:"⛔ กระแสเกินพิกัด — ฟิวส์มิเตอร์ขาด"};
+    }
+    val=amps;
+    hint=amps>.000001?"วัดผ่าน shunt ภายใน — ต่อมิเตอร์แบบอนุกรมถูกต้อง":"ไม่มีกระแสไหลผ่านมิเตอร์ (ตรวจว่าตัดสายเดิมและต่ออนุกรมแล้ว)";
     if(r.u==="mA")val*=1000; if(r.u==="µA")val*=1e6;
+  }
+  else if(r.fn==="cap"){
+    mode="CAP";
+    if(!disc&&probePairIsLive(V,red,blk))return {txt:"OL",unit:"µF",mode,hint:"⚠ คายประจุและตัดไฟจากตัวเก็บประจุก่อนวัด"};
+    const cap=S().parts.find(p=>["CAP","CAP2"].includes(p.type)&&samePins(red,blk,p.id+".+",p.id+".-"));
+    if(!cap)return {txt:"OL",unit:"µF",mode,hint:"ต่อหัววัดคร่อมขั้ว + / − ของตัวเก็บประจุ"};
+    if(cap.damaged)return {txt:"OL",unit:"µF",mode,hint:"ตัวเก็บประจุเสียหรือวงจรเปิด"};
+    return {txt:fmtNum(Math.max(0,Number(cap.val)||0),r.dec),unit:"µF",mode,hint:"ค่าความจุที่วัดได้ (คายประจุแล้ว)"};
+  }
+  else if(r.fn==="hz"){
+    const p=red&&findP(red.split(".")[0]),P=p?.id+".";
+    let hz=0,duty=50,source="ไม่พบสัญญาณความถี่ที่จุดวัด";
+    if(p?.type==="AC"&&samePins(red,blk,P+"A",P+"B")){hz=acFrequency(p);source="ความถี่แหล่งจ่าย AC";}
+    else if(["CKP_VR","CMP_VR"].includes(p?.type)&&samePins(red,blk,P+"S+",P+"S-")){hz=Math.max(0,Number(p.val)||0)/60;source="ความถี่สัญญาณ VR ตามรอบเครื่อง";}
+    else if(["CKP_HALL","CMP_HALL"].includes(p?.type)&&samePins(red,blk,P+"SIG",P+"GND")){hz=Math.max(0,Number(p.val)||0)/60;source="สัญญาณ Hall duty 50%";}
+    mode=dmmHzDuty?"DUTY":"Hz";
+    return dmmHzDuty?{txt:fmtNum(duty,0),unit:"%",mode,hint:source}:{txt:fmtNum(hz,0),unit:"Hz",mode,hint:source};
   }
   else if(r.fn==="diode"){
     mode="⊳| ไดโอด";
     const led=S().parts.find(p=>p.type==="LEDp"&&samePins(red,blk,p.id+".A",p.id+".K"));
+    const diode=S().parts.find(p=>p.type==="DIODE"&&samePins(red,blk,p.id+".A",p.id+".K"));
     if(led&&red===led.id+".A")return {txt:"1.92",unit:"V",mode,hint:"LED นำกระแสทิศทาง A → K, ค่า Vf ปกติ"};
     if(led)return {txt:"OL",unit:"V",mode,hint:"กลับขั้ว LED — ไดโอดไม่นำกระแส"};
+    if(diode&&diode.damaged)return {txt:"OL",unit:"V",mode,hint:"ไดโอด 1N4007 เสียหรือวงจรเปิด"};
+    if(diode&&red===diode.id+".A")return {txt:"0.70",unit:"V",mode,hint:"ไดโอด 1N4007 นำกระแสทิศทาง A → K, ค่า Vf ปกติประมาณ 0.70 V"};
+    if(diode)return {txt:"OL",unit:"V",mode,hint:"กลับขั้ว 1N4007 — ไดโอดไม่นำกระแส"};
     return {txt:"OL",unit:"V",mode,hint:"ไม่มีไดโอด/LED คร่อมจุดวัดนี้"};
   }
   /* เกินย่าน → OL */
@@ -3620,14 +3864,22 @@ function loop(){
  syncBuzzerAudio(V);
  syncStarterAudio();
  updateLivePropertyPanel();
- const rd=dmmRead(V,R,$("chkDisc").checked);
- updateReferenceLive(rd);
+ let rawDmm=dmmRead(V,R,$("chkDisc").checked);
+ /* Auto Range เปลี่ยน sub-range ตามค่าจริง โดยไม่รีเซ็ตการต่อหัววัด */
+ if(dmmAutoSelectRange(rawDmm)){buildDMM();rawDmm=dmmRead(V,R,$("chkDisc").checked);}
+ const rd=dmmPresentReading(rawDmm);
+ syncDmmContinuityAudio(rawDmm);
+ updateReferenceLive(rawDmm);
  const lv=document.getElementById("lcdVal"),lu=document.getElementById("lcdUnit"),
        lm=document.getElementById("lcdMode");
  if(lv){lv.textContent=rd.txt;lu.textContent=rd.unit;lm.textContent=rd.mode;
    /* ย่อขนาดตัวเลขอัตโนมัติตามความยาว กันข้อความล้นทับกรอบ/ทับ unit-mode */
    const len=rd.txt.length;
    lv.setAttribute("font-size",len<=5?40:len<=7?32:len<=9?26:20);}
+ const flags=$("lcdFlags"),status=$("lcdStatus"),activeRange=RANGES.find(r=>r.id===dmmRange);
+ if(flags){const signal=activeRange?.fn==="vac"?"AC":activeRange?.fn==="vdc"?"DC":dmmCurrentRange(activeRange)?(dmmCurrentAc?"AC":"DC"):"";
+   flags.textContent=`${dmmAutoRange?"AUTO":"MAN"}${dmmHold?"  HOLD":""}${dmmRelative?"  REL":""}  ${signal}`.trim();}
+ if(status)status.textContent=`APO  ${dmmLowBattery?"▱ LOW":"▰"}${dmmMilliFuseBlown||dmmTenAFuseBlown?"  FUSE":""}`;
  $("hint").textContent=rd.hint;
 
  const chRed=otherEnd(`SCOPE.${activeCh}.RED`), chBlack=otherEnd(`SCOPE.${activeCh}.BLACK`);
