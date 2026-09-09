@@ -115,6 +115,8 @@ td{padding:6px 5px;border-top:1px solid #eef1f5}
 .battery-recharge{cursor:pointer;pointer-events:all}
 .battery-recharge-bg{fill:#087a3f;stroke:#d8ffe8;stroke-width:1.4}
 .battery-recharge:hover .battery-recharge-bg,.battery-recharge:focus .battery-recharge-bg{fill:#0aa354;stroke:#fff6a8;stroke-width:2}
+.battery-refill .battery-recharge-bg{fill:#148bb8;stroke:#d5f4ff}
+.battery-refill:hover .battery-recharge-bg,.battery-refill:focus .battery-recharge-bg{fill:#1aa5d4;stroke:#fff}
 /* 1N4007 stays cardless; its title and A/K labels float beside the real part. */
 .realistic-diode{overflow:visible;cursor:move}
 .realistic-diode .diode-pin{cursor:crosshair}
@@ -454,6 +456,28 @@ const fmtmA=i=>Number.isFinite(i)?`${(i*1000).toFixed(Math.abs(i)<.01?2:1)} mA`:
 const fmtW=p=>Number.isFinite(p)?`${p.toFixed(p<10?2:1)} W`:"—";
 /* แบตเตอรี่: 1 วินาทีจริง = 1 นาทีในเวลา simulation เพื่อให้เห็นการคายประจุระหว่างทดลอง */
 const BATTERY_SIM_SECONDS_PER_REAL_SECOND=60;
+const BATTERY_TYPES=new Set(["BATT","FLA_BATT"]);
+const isBattery=p=>BATTERY_TYPES.has(p?.type);
+const isFloodedBattery=p=>p?.type==="FLA_BATT";
+const FLOODED_BATTERY_FAULTS={
+ NORMAL:{label:"ปกติ (Normal)",detail:"OCV และ CCA อยู่ในเกณฑ์; ตาแมวแสดงตามระดับประจุ"},
+ LOW_ELECTROLYTE:{label:"น้ำกลั่นแห้ง (Low Electrolyte)",detail:"น้ำต่ำกว่าแผ่นธาตุ — ความต้านทานภายในสูง จ่ายกระแสสตาร์ทไม่ได้"},
+ SULFATED:{label:"เสื่อม / ซัลเฟต (Sulfated)",detail:"OCV ดูใกล้ปกติ แต่ CCA เหลือน้อยและแรงดันร่วงมากเมื่อทดสอบโหลด"},
+ SHORT_CELL:{label:"ช็อตเซลล์ (Shorted Cell)",detail:"เสีย 1 เซลล์ — OCV สูงสุด 10.5 V ควรเปลี่ยนแบตเตอรี่"},
+ OPEN_CIRCUIT:{label:"แผ่นธาตุขาด (Open Circuit)",detail:"วงจรเปิด — OCV 0 V และไม่สามารถจ่ายกระแสได้"}
+};
+const floodedBatteryFault=p=>FLOODED_BATTERY_FAULTS[p?.floodedFault]?p.floodedFault:"NORMAL";
+const floodedWaterLevel=p=>floodedBatteryFault(p)==="LOW_ELECTROLYTE"?0:Math.max(0,Math.min(100,Number(p?.electrolyteLevel) || 100));
+const floodedRatedCca=p=>Math.max(300,Math.min(800,Number(p?.battMaxCurrent)||600));
+const floodedBaseResistance=p=>Math.max(.003,Math.min(.005,(Number(p?.floodedRiMOhm)||4)/1000));
+const floodedEffectiveCca=p=>{const cca=floodedRatedCca(p),fault=floodedBatteryFault(p);
+ return fault==="OPEN_CIRCUIT"?0:fault==="LOW_ELECTROLYTE"?Math.round(cca*.08):fault==="SULFATED"?Math.round(cca*.25):fault==="SHORT_CELL"?Math.round(cca*.15):cca;};
+const floodedMagicEye=p=>{const fault=floodedBatteryFault(p),water=floodedWaterLevel(p),soc=batterySoc(p);
+ if(water<15)return {key:"clear",color:"#f4f7fa",stroke:"#d85a52",label:"ใส / แดง — เติมน้ำกลั่น"};
+ if(fault==="SHORT_CELL"||fault==="OPEN_CIRCUIT"||soc<50)return {key:"black",color:"#2f343b",stroke:"#101318",label:"ดำ / เทา — ชาร์จแบตเตอรี่"};
+ if(soc>=75)return {key:"green",color:"#29b765",stroke:"#0b7037",label:"เขียว — พร้อมใช้งาน"};
+ return {key:"black",color:"#5c626b",stroke:"#222830",label:"เทา — ควรชาร์จแบตเตอรี่"};
+};
 const batteryNominalVoltage=p=>Math.max(1,Math.min(96,Number(p.battVoltage)||12));
 const batteryCapacityUnit=p=>p.battCapacityUnit==="mAh"?"mAh":"Ah";
 const batteryCapacityAh=p=>{const raw=Number(p.battCapacity);const value=Number.isFinite(raw)&&raw>0?raw:(batteryCapacityUnit(p)==="mAh"?45000:45);return batteryCapacityUnit(p)==="mAh"?Math.max(.01,Math.min(10000,value/1000)):Math.max(.01,Math.min(10000,value));};
@@ -461,14 +485,25 @@ const batteryCapacityDisplay=p=>batteryCapacityUnit(p)==="mAh"?batteryCapacityAh
 const batteryMaxCurrent=p=>Math.max(.1,Math.min(5000,Number(p.battMaxCurrent)||400));
 const batteryRemainingAh=p=>{const cap=batteryCapacityAh(p),value=Number(p.remainingAh);return Number.isFinite(value)?Math.max(0,Math.min(cap,value)):cap;};
 const batterySoc=p=>batteryCapacityAh(p)>0?Math.max(0,Math.min(100,batteryRemainingAh(p)/batteryCapacityAh(p)*100)):0;
-const batteryOpenVoltage=p=>{const soc=batterySoc(p)/100;return soc<=.0001?0:batteryNominalVoltage(p)*(.90+.10*Math.sqrt(soc));};
+const batteryOpenVoltage=p=>{const soc=batterySoc(p)/100;
+ if(isFloodedBattery(p)){
+  const fault=floodedBatteryFault(p);if(fault==="OPEN_CIRCUIT")return 0;
+  if(fault==="SHORT_CELL")return soc<=.0001?0:10.5*(.90+.10*Math.sqrt(soc));
+  if(fault==="SULFATED")return soc<=.0001?0:Math.min(12.4,batteryNominalVoltage(p)*(.90+.10*Math.sqrt(soc)));
+ }
+ return soc<=.0001?0:batteryNominalVoltage(p)*(.90+.10*Math.sqrt(soc));};
 /* ทำให้เห็น voltage sag ได้จริง แต่ไม่ทำให้แบต CCA สูงตกครึ่งหนึ่งตั้งแต่โหลดปกติ */
-const batteryInternalResistance=p=>Math.max(.002,batteryNominalVoltage(p)/(batteryMaxCurrent(p)*8));
-const batteryIsEmpty=p=>!!p.batteryEmpty||batterySoc(p)<=.0001;
+const batteryInternalResistance=p=>{if(isFloodedBattery(p)){
+ const fault=floodedBatteryFault(p);if(fault==="OPEN_CIRCUIT")return INF;
+ if(fault==="LOW_ELECTROLYTE")return .065;if(fault==="SULFATED")return .045;if(fault==="SHORT_CELL")return .015;
+ return floodedBaseResistance(p);
+ }return Math.max(.002,batteryNominalVoltage(p)/(batteryMaxCurrent(p)*8));};
+const batteryIsEmpty=p=>floodedBatteryFault(p)==="OPEN_CIRCUIT"||!!p.batteryEmpty||batterySoc(p)<=.0001;
 function batteryTerminalVoltage(p){
  if(!componentEnabled(p)||batteryIsEmpty(p)||p.damaged)return 0;
  const ocv=batteryOpenVoltage(p),draw=Math.max(0,Number(p.outputCurrent)||0),limit=batteryMaxCurrent(p);
- const loaded=Math.max(0,ocv-Math.min(draw,limit)*batteryInternalResistance(p));
+ const internalR=batteryInternalResistance(p);if(!Number.isFinite(internalR))return 0;
+ const loaded=Math.max(0,ocv-Math.min(draw,limit)*internalR);
  return draw>limit?loaded*Math.max(.04,limit/draw):loaded;
 }
 const batteryLevelColor=soc=>soc<20?"#e05252":soc<50?"#e5a52a":"#2fbf5f";
@@ -481,7 +516,7 @@ const acInstantVoltage=p=>Math.max(0,Number(p.val)||0)*Math.SQRT2*Math.sin(2*Mat
    a damaged battery or unrelated fault.  The Settings-panel control may be
    used at any time, while the Canvas shortcut remains an empty-battery aid. */
 function rechargeBattery(p){
- if(!p||p.type!=="BATT")return false;
+ if(!isBattery(p))return false;
  snap();
  p.remainingAh=batteryCapacityAh(p);
  p.batteryEmpty=false;p.batteryEmptyAlerted=false;p.outputCurrent=0;
@@ -492,6 +527,97 @@ function rechargeBattery(p){
  showToast(`🔋 รีเซ็ตแบตเตอรี่ ${p.id} เป็น 100% แล้ว — เริ่มคำนวณวงจรใหม่`);
  render();
  return true;
+}
+function refillDistilledWater(p){
+ if(!isFloodedBattery(p))return false;
+ snap();p.electrolyteLevel=100;
+ if(floodedBatteryFault(p)==="LOW_ELECTROLYTE")p.floodedFault="NORMAL";
+ p.batteryEmpty=false;p.batteryEmptyAlerted=false;
+ showToast(`💧 เติมน้ำกลั่นแบตเตอรี่ ${p.id} เต็ม 100% แล้ว`);render();return true;
+}
+function setFloodedBatteryFault(p,fault){
+ if(!isFloodedBattery(p))return;
+ p.floodedFault=FLOODED_BATTERY_FAULTS[fault]?fault:"NORMAL";
+ if(p.floodedFault==="LOW_ELECTROLYTE")p.electrolyteLevel=0;
+ if(p.floodedFault==="NORMAL")p.electrolyteLevel=100;
+ p.batteryEmpty=false;p.batteryEmptyAlerted=false;p.outputCurrent=0;p.currentLimited=false;
+}
+const analyzerRatedCca=p=>Math.max(100,Math.min(1000,Number(p?.analyzerRatedCca)||600));
+const analyzerLoadCurrent=p=>Math.max(25,Math.min(250,Math.round(analyzerRatedCca(p)*.25)));
+const analyzerLoadResistance=p=>p?.loadActive?12.6/analyzerLoadCurrent(p):INF;
+function analyzerConnection(p,V={}){
+ if(!p?.id)return {battery:null,connected:false,voltage:0};
+ const red=wireNodeSet(p.id+".RED"),black=wireNodeSet(p.id+".BLACK");
+ const battery=S().parts.find(b=>isFloodedBattery(b)&&red.has(b.id+".POS")&&black.has(b.id+".NEG"));
+ const voltage=battery?Math.abs((V[p.id+".RED"]??V[battery.id+".POS"]??0)-(V[p.id+".BLACK"]??V[battery.id+".NEG"]??0)):0;
+ return {battery,connected:!!battery&&voltage>6,voltage};
+}
+const analyzerSocFromOcv=ocv=>{const v=Number(ocv)||0;return Math.round(Math.max(0,Math.min(100,v>=12?25+(v-12)*75/.6:25*(v-11.7)/.3)));};
+function analyzerVerdict(b,rated){
+ const ocv=batteryOpenVoltage(b),soc=analyzerSocFromOcv(ocv),cca=floodedEffectiveCca(b),ri=batteryInternalResistance(b),soh=Math.max(0,Math.min(100,cca/rated*100));
+ let verdict="GOOD BATTERY";
+ if(floodedBatteryFault(b)==="SHORT_CELL"||ocv<10.8)verdict="BAD CELL, REPLACE";
+ else if(floodedBatteryFault(b)==="OPEN_CIRCUIT"||soh<50||ri>.050)verdict="REPLACE";
+ else if(soh<60&&soc<50)verdict="CHARGE & RETEST";
+ else if(soh>=80&&soc<75)verdict="GOOD, RECHARGE";
+ else if(soh<80)verdict="REPLACE";
+ return {ocv,soc,cca,ri,soh,verdict};
+}
+const ANALYZER_MENU_STEPS=["LOCATION","BATTERY TYPE","STANDARD","RATED CCA"];
+const analyzerMenuStep=p=>Math.max(0,Math.min(4,Math.round(Number(p?.analyzerMenuStep)||0)));
+function analyzerScreenLines(p){
+ if(!p?.id)return {main:"BATTERY ANALYZER",sub:"12V SYSTEM TEST"};
+ if(p.testing)return {main:"TESTING...",sub:"DO NOT DISCONNECT"};
+ if(!p.powered)return {main:"CONNECT CLAMPS",sub:"RED +  /  BLACK −"};
+ if(p.analyzerResult){const r=p.analyzerResult,v=r.verdict||"RESULT",main=v==="GOOD BATTERY"?"GOOD BATTERY":v==="GOOD, RECHARGE"?"GOOD • RECHARGE":v==="CHARGE & RETEST"?"CHARGE & RETEST":v.includes("BAD CELL")?"BAD CELL • REPLACE":"REPLACE BATTERY";
+  return {main,sub:`${fmtV(r.loadVoltage||r.ocv)}  ${r.cca||0} CCA  SOH ${Math.round(r.soh||0)}%`};}
+ const step=analyzerMenuStep(p),location=p.analyzerLocation==="OUT"?"OUT-VEHICLE":"IN-VEHICLE",type=["AGM","GEL"].includes(p.analyzerBatteryType)?p.analyzerBatteryType:"FLOODED",standard=["CCA","JIS","EN","DIN","SAE","IEC"].includes(p.analyzerStandard)?p.analyzerStandard:"CCA";
+ if(step===0)return {main:"1 LOCATION",sub:location};
+ if(step===1)return {main:"2 BATTERY TYPE",sub:type};
+ if(step===2)return {main:"3 STANDARD",sub:standard};
+ return {main:"4 RATED CCA",sub:`${analyzerRatedCca(p)} CCA  ENTER TEST`};
+}
+const analyzerScreenText=p=>analyzerScreenLines(p).main;
+function changeAnalyzerMenuValue(p,direction){
+ const step=analyzerMenuStep(p),delta=direction>0?1:-1;
+ if(step===0)p.analyzerLocation=p.analyzerLocation==="OUT"?"IN":"OUT";
+ else if(step===1){const list=["FLOODED","AGM","GEL"],at=Math.max(0,list.indexOf(p.analyzerBatteryType));p.analyzerBatteryType=list[(at+delta+list.length)%list.length];}
+ else if(step===2){const list=["CCA","JIS","EN","DIN","SAE","IEC"],at=Math.max(0,list.indexOf(p.analyzerStandard));p.analyzerStandard=list[(at+delta+list.length)%list.length];}
+ else p.analyzerRatedCca=Math.max(100,Math.min(1000,analyzerRatedCca(p)+delta*25));
+}
+function runBatteryAnalysis(p){
+ if(p?.testing)return false;
+ const start=analyzerConnection(p,solveAll().V);
+ if(!start.connected){showToast("⚠ คีบสาย RED ที่ POS (+) และ BLACK ที่ NEG (−) ของแบตเตอรี่ก่อน");return false;}
+ snap();const token=(Number(p.testToken)||0)+1;p.testToken=token;p.testing=true;p.loadActive=true;p.loadMin=Infinity;p.analyzerResult=null;render();
+ setTimeout(()=>{if(findP(p.id)!==p||p.testToken!==token||!p.testing)return;const connection=analyzerConnection(p,solveAll().V);
+  p.testing=false;p.loadActive=false;
+  if(!connection.connected){p.analyzerResult=null;showToast("⚠ สายคีบหลุดระหว่างทดสอบ");render();return;}
+  const result=analyzerVerdict(connection.battery,analyzerRatedCca(p));result.loadCurrent=analyzerLoadCurrent(p);result.loadVoltage=Number.isFinite(p.loadMin)?p.loadMin:connection.voltage;
+  if(result.loadVoltage<9.6&&!result.verdict.includes("BAD CELL"))result.verdict="REPLACE";
+  p.analyzerResult={...result,batteryId:connection.battery.id,testedAt:Date.now()};p.analyzerMenuStep=4;
+  showToast(`🔎 ผลทดสอบ ${connection.battery.id}: ${result.verdict}`);render();
+ },1300);
+ return true;
+}
+function analyzerControl(p,action){
+ if(!p?.id||findP(p.id)!==p)return;
+ if(action==="up"||action==="down"){snap();changeAnalyzerMenuValue(p,action==="up"?1:-1);p.analyzerResult=null;render();return;}
+ if(action==="enter"){if(!p.powered){showToast("⚠ เครื่องทดสอบจะเปิดเมื่อคีบ RED → POS และ BLACK → NEG ครบ");return;}if(analyzerMenuStep(p)<3){snap();p.analyzerMenuStep=analyzerMenuStep(p)+1;render();}else runBatteryAnalysis(p);return;}
+ if(action==="back"){snap();p.testToken=(Number(p.testToken)||0)+1;p.testing=false;p.loadActive=false;if(p.analyzerResult){p.analyzerResult=null;p.analyzerMenuStep=3;}else p.analyzerMenuStep=Math.max(0,analyzerMenuStep(p)-1);render();}
+}
+function syncBatteryAnalyzers(V){
+ S().parts.filter(p=>p.type==="BATT_ANALYZER").forEach(p=>{
+  const c=analyzerConnection(p,V);p.powered=c.connected;p.connectedBatteryId=c.battery?.id||"";p.clampVoltage=c.voltage;
+  if(!c.connected){p.crankMin=null;p.loadMin=null;p.crankStatus="รอคีบสาย";p.chargeStatus="รอคีบสาย";return;}
+  if(p.loadActive)p.loadMin=Math.min(Number.isFinite(p.loadMin)?p.loadMin:Infinity,c.voltage);
+  const cranking=S().parts.some(x=>(x.type==="IGN"&&ignitionStage(x)==="START")||(x.type==="STARTER"&&x.startCommanded));
+  if(cranking){p.crankMin=Math.min(Number.isFinite(p.crankMin)?p.crankMin:Infinity,c.voltage);p.crankStatus=p.crankMin>=9.6?"CRANKING NORMAL":"CRANKING LOW";}
+  else if(Number.isFinite(p.crankMin))p.crankStatus=p.crankMin>=9.6?"CRANKING NORMAL":"CRANKING LOW";
+  else p.crankStatus="รอ START";
+  const ripple=Math.max(0,Number(p.chargingRipple)||.08),chargeV=p.engineRunning?Math.max(10,Math.min(16,Number(p.simChargeVoltage)||13.8)):c.voltage;p.chargeRipple=ripple;p.chargeVoltage=chargeV;
+  p.chargeStatus=!p.engineRunning?"รอระบบชาร์จ":chargeV>=13.5&&chargeV<=14.8?(ripple<=.30?"CHARGING NORMAL":"RIPPLE HIGH"):chargeV>14.8?"CHARGING HIGH":"CHARGING LOW";
+ });
 }
 
 /* ═══ ตัวต้านทาน: รหัสสี 4/5 แถบ ↔ ค่าโอห์ม (ชุดข้อมูลเดียวกันทั้งภาพและวงจร) ═══ */
@@ -597,6 +723,10 @@ const DEF={
  APP:{nm:"เซ็นเซอร์คันเร่งไฟฟ้า APP",ic:"🦶",w:400,fill:"#3b4655",head:"#27313d",pins:APP_PINS_9},
  BATT:{nm:"แบตเตอรี่ 12V",ic:"🔋",w:132,fill:"#4a3b22",head:"#372c19",
   pins:[["+","ขั้วบวก +","#e06c75"],["-","ขั้วลบ −","#9aa5b1"]]},
+ FLA_BATT:{nm:"แบตเตอรี่ตะกั่วกรด",ic:"🔋",w:198,fill:"#34434a",head:"#243137",
+  pins:[["POS","POS (+) / Terminal 30","#e06c75"],["NEG","NEG (−) / Ground Body","#9aa5b1"]]},
+ BATT_ANALYZER:{nm:"เครื่องทดสอบแบตดิจิทัล",ic:"🧪",w:222,fill:"#313b46",head:"#222a33",
+  pins:[["RED","คีบแดง POS (+)","#e05252"],["BLACK","คีบดำ NEG (−)","#31343b"]]},
  IGN:{nm:"สวิตช์กุญแจ",ic:"🔑",w:192,fill:"#3b4148",head:"#222a33",
   pins:[["ACC","อุปกรณ์เสริม ACC / ขั้ว 1","#98c379"],["IGN","ระบบจุดระเบิด IG / ขั้ว 15","#e5c07b"],
         ["ST","สตาร์ท ST / ขั้ว 50","#e06c75"],["BAT","ไฟแบตเตอรี่ B / ขั้ว 30","#e06c75"]]},
@@ -732,7 +862,8 @@ const ELECTRICAL={
  CMP_VR:"CMP VR 2 ขา, ขดลวดประมาณ 750 Ω", KNOCK:"Knock 2 ขา, piezo sensor ความต้านทานสูง",
  APP:"APP คันเร่งไฟฟ้าแบบสัญญาณคู่: Signal 1 = 0.8–4.2 V, Signal 2 = ครึ่งหนึ่งของ Signal 1; เลือกปลั๊ก 6/9 พินได้",
  GND:"ตัวถัง 0 V",
- BATT:"กำหนด V / Ah (หรือ mAh) / กระแสจ่ายสูงสุดได้; SOC และแรงดันตกตามโหลด", IGN:"สวิตช์กุญแจ 4 ตำแหน่ง: LOCK, ACC, ON และ START (สปริงกลับ ON)",
+ BATT:"กำหนด V / Ah (หรือ mAh) / กระแสจ่ายสูงสุดได้; SOC และแรงดันตกตามโหลด", FLA_BATT:"แบตเตอรี่ตะกั่วกรด 12.6 V: CCA 300–800, Ri 3–5 mΩ, ตาแมวและระดับน้ำกลั่นจำลองได้", BATT_ANALYZER:"เครื่องวิเคราะห์แบตเตอรี่ดิจิทัล: คีบ RED/BLACK ที่ POS/NEG แล้ววิเคราะห์ SOC, SOH, CCA, การสตาร์ทและการชาร์จ",
+ IGN:"สวิตช์กุญแจ 4 ตำแหน่ง: LOCK, ACC, ON และ START (สปริงกลับ ON)",
  STARTER:"โซลีนอยด์ 0.5–2 Ω; เลือกจำลองปกติ / คลิกอย่างเดียว / หมุนฟรี / ติดขัด / ขดลวดขาดได้", PSU:"0–30 V DC, จำกัดกระแสเพื่อการเรียนรู้",
  AC:"0–1000 V RMS, 50 Hz", SW:"หน้าสัมผัส < 0.05 Ω เมื่อ ON", PB:"ปุ่มกด NO แบบ momentary, < 0.05 Ω เมื่อกด",
  MCB:"MCB 5 A, หน้าสัมผัส < 0.02 Ω เมื่อ ON", FUSE2:"ฟิวส์ 1 A, 0.05 Ω เมื่อปกติ",
@@ -753,7 +884,7 @@ const INTERNAL_EDGES={RES:[["A","B"]],LDR:[["A","B"]],POT:[["1","2"],["1","W"],[
  RELAY:[["COIL+","COIL-"],["COM","NO"],["COM","NC"]],XFMR:[["P1","P2"],["S1","S2"]],
  MAF:[["IAT","GND"]],O2:[["Heater+","Heater-"]],CMP_HALL:[["GND","SIG"],["SIG","B+"]],
  CMP_VR:[["S+","S-"]],KNOCK:[["SIG","GND"]],
- APP:[["VREF1","GND1"],["VREF2","GND2"],["IDLE","GND-I"]],OPTO:[["IN+","IN-"],["OUT+","OUT-"]]};
+ APP:[["VREF1","GND1"],["VREF2","GND2"],["IDLE","GND-I"]],BATT_ANALYZER:[["RED","BLACK"]],OPTO:[["IN+","IN-"],["OUT+","OUT-"]]};
 function internalPass(p,pa,pb){
  if(!componentEnabled(p)||p.damaged)return false; /* ชิ้นส่วนที่ปิด/ไหม้/ขาดเป็นวงจรเปิด ทั้งในกราฟและมัลติมิเตอร์ */
  if(p.type==="SW"||p.type==="PB"||p.type==="MCB"||p.type==="FUSE2")return !!p.on;
@@ -774,6 +905,7 @@ function internalPass(p,pa,pb){
   if((pa==="B"&&pb==="GND")||(pa==="GND"&&pb==="B"))return !!p.motorCircuitOn;
   return false;
  }
+ if(p.type==="BATT_ANALYZER")return !!p.loadActive;
  if(p.type==="CAP"||p.type==="CAP2")return false;
  if(p.type==="XFMR"||p.type==="OPTO")return pa[0]===pb[0];
  return true;}
@@ -790,7 +922,7 @@ function floodOnce(){
  const adj=buildGraph();const HIGH=new Set(),LOW=new Set();
  const highSeeds=[],lowSeeds=[];let srcV=12;
  S().parts.forEach(p=>{if(!componentEnabled(p))return;
-  if(p.type==="BATT"&&!batteryIsEmpty(p)&&!p.damaged){highSeeds.push(p.id+".+");lowSeeds.push(p.id+".-");srcV=batteryTerminalVoltage(p);}
+  if(isBattery(p)&&!batteryIsEmpty(p)&&!p.damaged){highSeeds.push(p.id+"."+(p.type==="FLA_BATT"?"POS":"+"));lowSeeds.push(p.id+"."+(p.type==="FLA_BATT"?"NEG":"-"));srcV=batteryTerminalVoltage(p);}
   if(p.type==="PSU"){highSeeds.push(p.id+".+");lowSeeds.push(p.id+".-");srcV=p.val;}
   if(p.type==="AC"){const ac=acInstantVoltage(p);highSeeds.push(p.id+(ac>=0?".A":".B"));lowSeeds.push(p.id+(ac>=0?".B":".A"));srcV=Math.abs(ac);}
   if(p.type==="GND")lowSeeds.push(p.id+".G");});
@@ -824,7 +956,9 @@ const NOTE={ECT:"NTC : ยิ่งร้อน ความต้านทา�
  CMP_HALL:"CMP Hall: B+ 12V, GND และสัญญาณดิจิทัล 0–5V",
  CMP_VR:"CMP VR: ตรวจขดลวดและรูปคลื่น AC เมื่อหมุนเครื่อง",
  KNOCK:"Knock แบบ piezo: วัดความต้านทานสูง/ไม่ลัดลงกราวด์",
- APP:"APP ใช้สัญญาณสำรองอัตราส่วน 2:1; หากไม่สัมพันธ์กัน ECU จะเข้า Limp Home พร้อม DTC"};
+ APP:"APP ใช้สัญญาณสำรองอัตราส่วน 2:1; หากไม่สัมพันธ์กัน ECU จะเข้า Limp Home พร้อม DTC",
+ FLA_BATT:"คีบ RED ของเครื่องทดสอบที่ POS (+) และ BLACK ที่ NEG (−); OCV เต็ม 12.6–12.8 V และแรงดันขณะสตาร์ทไม่ควรต่ำกว่า 9.6 V",
+ BATT_ANALYZER:"เลือกพิกัด CCA ให้ตรงหน้าแบตเตอรี่ แล้วกด ENTER เพื่อวิเคราะห์; เครื่องติดเมื่อคีบถูกขั้วและมีไฟมากกว่า 6 V"};
 const FAULTS={NONE:"ปกติ (ไม่มีอาการเสีย)",OPEN:"วงจรขาด — Open Circuit",
  SHORT_GND:"ช็อตลงกราวด์ — Short to Ground",SHORT_BP:"ช็อตไฟบวก — Short to B+",
  HIGH_R:"ความต้านทานสูงผิดปกติ — High Resistance"};
@@ -832,6 +966,9 @@ const ntcR=(t,R25=2000,B=3500)=>R25*Math.exp(B*(1/(t+273.15)-1/298.15));
 const divV=r=>r===INF?VREF:VREF*r/(RPULL+r);
 const tpsV=p=>0.55+3.9*p/100, mapV=k=>0.30+4.35*(k-20)/81;
 const REF=[
+ ["FLA_BATT","แรงดันวงจรเปิด SOC 100%","V",12.60,12.70,12.80,"วัด POS (+) เทียบ NEG (−)",["POS","NEG"]],
+ ["FLA_BATT","แรงดันวงจรเปิด SOC ~25%","V",11.90,12.00,12.10,"วัด POS (+) เทียบ NEG (−) ก่อนทดสอบโหลด",["POS","NEG"]],
+ ["FLA_BATT","ขณะทดสอบโหลด / สตาร์ท","V",9.60,10.50,12.20,"คีบเครื่องทดสอบหรือมิเตอร์ที่ POS/NEG; ต้องไม่ต่ำกว่า 9.6 V",["POS","NEG"]],
  ["ECT","อุณหภูมิ 20°C","R Ω",2300,2443,2600,"ถอดปลั๊ก วัดคร่อมขา 1-2"],
  ["ECT","อุณหภูมิ 80°C","R Ω",290,321,360,"ถอดปลั๊ก วัดคร่อมขา 1-2"],
  ["ECT","อุณหภูมิ 20°C","V",2.40,2.63,2.85,"เสียบปลั๊ก วัดขา SIG เทียบกราวด์"],
@@ -1235,6 +1372,8 @@ function realisticTerminal(p,index){
  }
  if(p.type==="IGN")return{x:d.w/2+(index-1.5)*40,y:112};
  if(p.type==="STARTER")return{x:d.w/2+(index-1)*47,y:112};
+ if(p.type==="FLA_BATT")return{x:d.w/2+(index-.5)*58,y:112};
+ if(p.type==="BATT_ANALYZER")return{x:d.w/2+(index-.5)*68,y:142};
  if(p.type==="MAF")return{x:d.w/2+(index-2)*48,y:112};
  if(p.type==="O2")return{x:d.w/2+(index-1.5)*50,y:112};
  if(p.type==="APP"){const count=pinsFor(p).length,spacing=count===9?45:52;return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};}
@@ -1308,13 +1447,16 @@ function appendRelayPinLabel(parent,terminal,pinName){
 }
 const STANDARD_TERMINAL_LABELS={
  IGN:{ACC:"ACC / 1",IGN:"IG / 15",ST:"ST / 50",BAT:"B / 30"},
- STARTER:{S:"Terminal 50",B:"Terminal 30",GND:"Body"}
+ STARTER:{S:"Terminal 50",B:"Terminal 30",GND:"Body"},
+ FLA_BATT:{POS:"Terminal 30",NEG:"Ground / Body"},
+ BATT_ANALYZER:{RED:"Red Clamp +",BLACK:"Black Clamp −"}
 };
+const STANDARD_TERMINAL_PRIMARY={FLA_BATT:{POS:"POS (+)",NEG:"NEG (−)"},BATT_ANALYZER:{RED:"RED (+)",BLACK:"BLACK (−)"}};
 function appendStandardPinLabel(parent,terminal,pinName,type){
- const second=STANDARD_TERMINAL_LABELS[type]?.[pinName]||"",width=type==="STARTER"?52:40;
+ const second=STANDARD_TERMINAL_LABELS[type]?.[pinName]||"",width=type==="STARTER"?52:type==="BATT_ANALYZER"?56:50;
  const box=mk("foreignObject",{class:"standard-pin-label-box",x:terminal.x-width/2,y:terminal.y+13,width,height:31});
  const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="standard-pin-label";
- const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const main=document.createElement("span");main.textContent=STANDARD_TERMINAL_PRIMARY[type]?.[pinName]||pinName;label.appendChild(main);
  const number=document.createElement("span");number.className="terminal-number";number.textContent=second;label.appendChild(number);
  box.appendChild(label);parent.appendChild(box);
 }
@@ -1551,6 +1693,31 @@ function partIcon(p){
     G.appendChild(mk("rect",{x:6,y:22,width:14,height:6,rx:2.5,fill:"#333"}));
     G.appendChild(mk("text",{x:13,y:8.5,"text-anchor":"middle","font-size":6.5,fill:"#fff","font-weight":700},"+"));
     G.appendChild(mk("text",{x:13,y:26.7,"text-anchor":"middle","font-size":6.5,fill:"#fff","font-weight":700},"−"));
+  } else if(t==="FLA_BATT"){
+    const eye=floodedMagicEye(p),water=floodedWaterLevel(p);
+    G.appendChild(mk("rect",{x:2,y:7,width:26,height:20,rx:2.2,fill:"#293940",stroke:"#101c20","stroke-width":1.15}));
+    G.appendChild(mk("rect",{x:3.5,y:10,width:23,height:14,rx:1.2,fill:"#40565c",stroke:"#779097","stroke-width":.55}));
+    G.appendChild(mk("path",{d:"M4 22 h22",stroke:water<15?"#87594f":"#65b6d1","stroke-width":1.7,opacity:.9}));
+    [5.5,9.4,13.3,17.2,21.1,25].forEach(x=>G.appendChild(mk("circle",{cx:x,cy:6.5,r:1.65,fill:"#d4d9d7",stroke:"#6b7478","stroke-width":.55})));
+    G.appendChild(mk("rect",{x:4,y:3,width:5,height:3,rx:.8,fill:"#ce4f46",stroke:"#7e261f","stroke-width":.55}));
+    G.appendChild(mk("rect",{x:21,y:3,width:5,height:3,rx:.8,fill:"#2b333a",stroke:"#090d10","stroke-width":.55}));
+    G.appendChild(mk("circle",{class:"flooded-magic-eye","data-battery-id":p.id||"",cx:21.8,cy:15,r:3.15,fill:eye.color,stroke:eye.stroke,"stroke-width":1.05}));
+    G.appendChild(mk("text",{x:10,y:17.2,"text-anchor":"middle","font-size":4.8,"font-weight":700,fill:"#f2f5f6"},"12V"));
+    G.appendChild(mk("text",{x:10,y:21.5,"text-anchor":"middle","font-size":3.7,fill:"#d8e2e4"},"FLOODED"));
+  } else if(t==="BATT_ANALYZER"){
+    const screen=analyzerScreenText(p);
+    G.appendChild(mk("path",{d:"M5 26 C1 25 1 22 3 21",fill:"none",stroke:"#e05252","stroke-width":1.2,"stroke-linecap":"round"}));
+    G.appendChild(mk("path",{d:"M25 26 C29 25 29 22 27 21",fill:"none",stroke:"#22272e","stroke-width":1.2,"stroke-linecap":"round"}));
+    G.appendChild(mk("rect",{x:2,y:2,width:26,height:27,rx:3,fill:"#2a3846",stroke:"#111922","stroke-width":1.2}));
+    G.appendChild(mk("rect",{x:5,y:5,width:20,height:8.5,rx:1,fill:"#9bc9a4",stroke:"#162b22","stroke-width":.9}));
+    G.appendChild(mk("text",{class:"analyzer-lcd","data-analyzer-id":p.id||"",x:15,y:10.7,"text-anchor":"middle","font-size":4.1,"font-family":"Consolas,monospace","font-weight":700,fill:"#153b29"},screen));
+    [["UP",6.5],["DN",12.2],["OK",17.9],["BK",23.6]].forEach(([label,x])=>{
+      const action=label==="UP"?"up":label==="DN"?"down":label==="OK"?"enter":"back",b=mk("g",{"data-analyzer-action":action,class:"no-drag",style:"cursor:pointer"});
+      b.appendChild(mk("rect",{x:x-2.15,y:18,width:4.3,height:4.4,rx:.8,fill:"#607487",stroke:"#111922","stroke-width":.45}));
+      b.appendChild(mk("text",{x,y:21.1,"text-anchor":"middle","font-size":2.35,"font-weight":700,fill:"#f4f7fa","pointer-events":"none"},label));G.appendChild(b);
+    });
+    G.appendChild(mk("text",{x:6,y:27.3,"text-anchor":"middle","font-size":3.2,"font-weight":700,fill:"#ff7670"},"+") );
+    G.appendChild(mk("text",{x:24,y:27.3,"text-anchor":"middle","font-size":3.2,"font-weight":700,fill:"#c8d0d7"},"−") );
   } else if(t==="PSU"){
     G.appendChild(mk("rect",{x:3,y:8,width:20,height:14,rx:2,fill:"#3a3a3a"}));
     G.appendChild(mk("rect",{x:23,y:12,width:3,height:6,fill:"#3a3a3a"}));
@@ -1580,6 +1747,38 @@ function partIcon(p){
   }
   return G;
 }
+/* Digital battery analyzer is drawn at its real workspace footprint instead
+   of as a tiny generic icon: LCD, rubber buttons, clamp leads and jacks are
+   all independently visible and retain their own click targets. */
+function realisticBatteryAnalyzer(p){
+ const G=mk("g",{class:"battery-analyzer-body"}),lines=analyzerScreenLines(p),powered=!!p.powered;
+ G.appendChild(mk("rect",{x:8,y:4,width:206,height:108,rx:16,fill:"#202a33",stroke:"#0d1318","stroke-width":3}));
+ G.appendChild(mk("rect",{x:13,y:9,width:196,height:98,rx:12,fill:"#384754",stroke:"#6e8290","stroke-width":1.4}));
+ G.appendChild(mk("path",{d:"M24 98 h174",fill:"none",stroke:"#1a252d","stroke-width":2,opacity:.8}));
+ G.appendChild(mk("text",{x:111,y:18,"text-anchor":"middle","font-size":8,"font-weight":700,"letter-spacing":1.2,fill:"#e7edf1"},"DIGITAL BATTERY ANALYZER"));
+ G.appendChild(mk("rect",{x:35,y:25,width:152,height:40,rx:4,fill:powered?"#99c99b":"#53636a",stroke:"#111d1a","stroke-width":2}));
+ G.appendChild(mk("rect",{x:39,y:29,width:144,height:32,rx:2,fill:powered?"#b8e4b4":"#657178",stroke:"rgba(255,255,255,.35)","stroke-width":.7}));
+ G.appendChild(mk("text",{class:"analyzer-lcd-main","data-analyzer-id":p.id||"",x:111,y:42,"text-anchor":"middle","font-size":10.2,"font-family":"Consolas,monospace","font-weight":700,fill:powered?"#123c2b":"#25353a"},lines.main));
+ G.appendChild(mk("text",{class:"analyzer-lcd-sub","data-analyzer-id":p.id||"",x:111,y:55,"text-anchor":"middle","font-size":7.2,"font-family":"Consolas,monospace","font-weight":700,fill:powered?"#1c4936":"#2f3b40"},lines.sub));
+ const controls=[["UP","up",42,"#596d7c"],["DOWN","down",79,"#596d7c"],["ENTER","enter",125,"#2e8a62"],["BACK","back",175,"#8a4d4d"]];
+ controls.forEach(([label,action,x,color])=>{const b=mk("g",{"data-analyzer-action":action,class:"no-drag analyzer-control",style:"cursor:pointer"});
+  b.appendChild(mk("rect",{x:x-16,y:76,width:32,height:20,rx:6,fill:color,stroke:"#18242d","stroke-width":1.5}));
+  b.appendChild(mk("rect",{x:x-12,y:79,width:24,height:5,rx:2.5,fill:"rgba(255,255,255,.15)"}));
+  b.appendChild(mk("text",{x,y:90,"text-anchor":"middle","font-size":label==="ENTER"?5.8:6.6,"font-weight":700,fill:"#f4f7f8","pointer-events":"none"},label));
+  b.appendChild(mk("title",{},label));G.appendChild(b);
+ });
+ /* Heavy gauge leads and colour-coded jack collars make the connection path
+    obvious before the user drags either clamp terminal to the battery. */
+ G.appendChild(mk("path",{d:"M61 102 C61 118 76 118 77 132",fill:"none",stroke:"#961f28","stroke-width":5,"stroke-linecap":"round"}));
+ G.appendChild(mk("path",{d:"M161 102 C161 118 146 118 145 132",fill:"none",stroke:"#20242a","stroke-width":5,"stroke-linecap":"round"}));
+ G.appendChild(mk("circle",{cx:77,cy:133,r:9,fill:"#e05252",stroke:"#711d23","stroke-width":2}));
+ G.appendChild(mk("circle",{cx:145,cy:133,r:9,fill:"#343a42",stroke:"#0f1419","stroke-width":2}));
+ G.appendChild(mk("text",{x:77,y:136.5,"text-anchor":"middle","font-size":8,"font-weight":700,fill:"#fff"},"+"));
+ G.appendChild(mk("text",{x:145,y:136.5,"text-anchor":"middle","font-size":8,"font-weight":700,fill:"#fff"},"−"));
+ G.appendChild(mk("text",{x:77,y:118,"text-anchor":"middle","font-size":6,"font-weight":700,fill:"#ffb2ac"},"RED CLAMP"));
+ G.appendChild(mk("text",{x:145,y:118,"text-anchor":"middle","font-size":6,"font-weight":700,fill:"#d7e0e5"},"BLACK CLAMP"));
+ return G;
+}
 function wireState(w,V){
   const a=V[w.a],b=V[w.b],av=Number.isFinite(a)?a:0,bv=Number.isFinite(b)?b:0;
   /* Voltage alone only means that a wire is energised.  Showing moving
@@ -1590,8 +1789,9 @@ function wireState(w,V){
 }
 const WIRE_COLORS=["#e7bd3f","#e05252","#2fbf5f","#3578e5","#4b5563"];
 function defaultWireColor(a,b){
- const isRed=s=>s==="DMM.RED"||/^SCOPE\..+\.RED$/.test(s);
- const isBlack=s=>s==="DMM.BLACK"||/^SCOPE\..+\.BLACK$/.test(s);
+ const isAnalyzerClamp=(s,pin)=>{const [id,terminal]=String(s||"").split(".");return findP(id)?.type==="BATT_ANALYZER"&&terminal===pin;};
+ const isRed=s=>s==="DMM.RED"||/^SCOPE\..+\.RED$/.test(s)||isAnalyzerClamp(s,"RED");
+ const isBlack=s=>s==="DMM.BLACK"||/^SCOPE\..+\.BLACK$/.test(s)||isAnalyzerClamp(s,"BLACK");
  return isRed(a)||isRed(b)?"#d32f2f":isBlack(a)||isBlack(b)?"#333":WIRE_COLORS[0];
 }
 function nextWireColor(w){
@@ -1660,6 +1860,16 @@ function batteryRechargeButton(p){
   b.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")activate(e);});
   return b;
 }
+function floodedRefillButton(p){
+  const d=DEF[p.type],width=112,height=22,x=p.x+d.w/2-width/2,y=p.y+126;
+  const b=mk("g",{class:"battery-recharge battery-refill no-drag",transform:`translate(${x},${y})`,role:"button",tabindex:"0","aria-label":`เติมน้ำกลั่น ${p.id}`});
+  b.appendChild(mk("rect",{class:"battery-recharge-bg",x:0,y:0,width,height,rx:11,fill:"#148bb8"}));
+  b.appendChild(mk("text",{x:width/2,y:15,"text-anchor":"middle","font-size":10.2,"font-weight":700,fill:"#fff","pointer-events":"none"},"💧 เติมน้ำกลั่น"));
+  b.appendChild(mk("title",{},"เติมน้ำกลั่นกลับเป็น 100%"));
+  const activate=e=>{e.preventDefault();e.stopPropagation();refillDistilledWater(p);};
+  b.addEventListener("pointerdown",e=>e.stopPropagation());b.addEventListener("pointerup",activate);
+  b.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")activate(e);});return b;
+}
 /* Axial 1N4007: unbanded black end = Anode (A), silver-banded end = Cathode
    (K).  Its local origin is the centre of the body, so rotation keeps both
    lead-end connection points exactly aligned with the drawing. */
@@ -1722,25 +1932,25 @@ function render(){
   S().parts.forEach(p=>{
     if(p.type==="DIODE"){partL.appendChild(realisticDiode(p));return;}
     const d=DEF[p.type],g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-component",opacity:componentEnabled(p)?1:.42});
-    const art=partIcon(p),sc=ICON_BOX/30;
-    art.setAttribute("transform",`translate(${(d.w-ICON_BOX)/2},10) scale(${sc})`);
+    const analyzer=p.type==="BATT_ANALYZER",art=analyzer?realisticBatteryAnalyzer(p):partIcon(p),sc=ICON_BOX/30;
+    if(!analyzer)art.setAttribute("transform",`translate(${(d.w-ICON_BOX)/2},10) scale(${sc})`);
     g.appendChild(art);
     g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":10.5,"font-weight":700,fill:"#263545"},componentName(p)));
-    if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:58,rx:ICON_BOX/2+8,ry:ICON_BOX/2+8,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+    if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:analyzer?58:58,rx:analyzer?108:ICON_BOX/2+8,ry:analyzer?60:ICON_BOX/2+8,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
     const pins=pinsFor(p);
     pins.forEach((pn,i)=>{const terminal=realisticTerminal(p,i);
       /* Metal lead from the rendered asset to its physical terminal. */
-      g.appendChild(mk("line",{x1:terminal.x,y1:92,x2:terminal.x,y2:terminal.y-6,stroke:"#b6bec6","stroke-width":2.6,"stroke-linecap":"round"}));
+      g.appendChild(mk("line",{x1:terminal.x,y1:analyzer?132:92,x2:terminal.x,y2:terminal.y-6,stroke:analyzer?(pn[0]==="RED"?"#b92d37":"#313840"):"#b6bec6","stroke-width":analyzer?3.4:2.6,"stroke-linecap":"round"}));
       const c=mk("circle",{cx:terminal.x,cy:terminal.y,r:8,fill:pn[2],stroke:"#12161b","stroke-width":2,class:"pin"});
       c.dataset.pid=p.id+"."+pn[0];
       c.appendChild(mk("title",{},`${p.id}.${pn[0]} — ${pn[1]}`));g.appendChild(c);
       if(p.type==="ECU")appendEcuPinLabel(g,terminal,pn[0]);
       else if(p.type==="RELAY")appendRelayPinLabel(g,terminal,pn[0]);
-      else if(p.type==="IGN"||p.type==="STARTER")appendStandardPinLabel(g,terminal,pn[0],p.type);
+      else if(["IGN","STARTER","FLA_BATT","BATT_ANALYZER"].includes(p.type))appendStandardPinLabel(g,terminal,pn[0],p.type);
       else if(SENSOR_TERMINAL_DETAILS[p.type]?.[pn[0]])appendSensorPinLabel(g,terminal,pn[0],p.type);
       else g.appendChild(mk("text",{class:"component-pin-label",x:terminal.x,y:terminal.y+20,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#344454"},pn[0]));});
     if(hasConfigurableSettings(p)){
-      const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"}),gx=d.w/2+38,gy=11;
+      const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"}),gx=analyzer?d.w-10:d.w/2+38,gy=11;
       gear.appendChild(mk("circle",{class:"component-settings-bg",cx:gx,cy:gy,r:11,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));
       gear.appendChild(mk("text",{x:gx,y:gy+4,"text-anchor":"middle","font-size":13,fill:"#334155"},"⚙"));
       gear.appendChild(mk("title",{},"ตั้งค่าอุปกรณ์"));
@@ -1752,6 +1962,13 @@ function render(){
       rotor.appendChild(mk("title",{},"คลิกหน้าสวิตช์เพื่อหมุน LOCK → ACC → ON → START"));
       rotor.onpointerup=e=>{e.stopPropagation();snap();cycleIgnitionStage(p);playUiSound("click");render();};
       g.appendChild(rotor);
+    }
+    if(p.type==="BATT_ANALYZER"){
+      art.querySelectorAll("[data-analyzer-action]").forEach(control=>{
+        control.addEventListener("pointerdown",e=>e.stopPropagation());
+        control.addEventListener("pointerup",e=>{e.preventDefault();e.stopPropagation();analyzerControl(p,control.getAttribute("data-analyzer-action"));});
+      });
+      g.appendChild(mk("title",{},"คีบ RED ที่ POS (+) และ BLACK ที่ NEG (−) ของแบตเตอรี่ตะกั่วกรด แล้วกด ENTER"));
     }
     if(TOGGLE_TYPES.has(p.type)){
       const on=!!p.on,cx=d.w/2+34,cy=24;
@@ -1798,7 +2015,8 @@ function render(){
     deleteButton.classList.add("component-delete");
     selectionL.appendChild(deleteButton);
   }
-  S().parts.filter(p=>p.type==="BATT"&&batteryIsEmpty(p)).forEach(p=>selectionL.appendChild(batteryRechargeButton(p)));
+  S().parts.filter(p=>isBattery(p)&&batteryIsEmpty(p)).forEach(p=>selectionL.appendChild(batteryRechargeButton(p)));
+  S().parts.filter(p=>isFloodedBattery(p)&&floodedWaterLevel(p)<100).forEach(p=>selectionL.appendChild(floodedRefillButton(p)));
   if(selWire&&S().wires.includes(selWire)){
     const a=wireEndpointPoint(selWire,"a"),b=wireEndpointPoint(selWire,"b");
     if(a&&b){const m=bezMid(a,b);
@@ -1875,6 +2093,8 @@ stage.addEventListener("pointerdown",e=>{const P=pt(e);
     if(arm==="LEDp")newPart.ledColor="red";
     if(arm==="BULB"){newPart.ratedV=12;newPart.ratedW=5;}
     if(arm==="BATT"){newPart.battVoltage=12;newPart.battCapacity=45;newPart.battCapacityUnit="Ah";newPart.battMaxCurrent=400;newPart.remainingAh=45;newPart.batteryEmpty=false;}
+    if(arm==="FLA_BATT"){newPart.battVoltage=12.6;newPart.battCapacity=65;newPart.battCapacityUnit="Ah";newPart.battMaxCurrent=600;newPart.floodedRiMOhm=4;newPart.electrolyteLevel=100;newPart.floodedFault="NORMAL";newPart.remainingAh=65;newPart.batteryEmpty=false;}
+    if(arm==="BATT_ANALYZER"){newPart.analyzerLocation="IN";newPart.analyzerBatteryType="FLOODED";newPart.analyzerStandard="CCA";newPart.analyzerRatedCca=600;newPart.analyzerMenuStep=0;newPart.chargingRipple=.08;newPart.simChargeVoltage=13.8;newPart.engineRunning=false;newPart.testing=false;newPart.powered=false;}
     if(arm==="DIODE")newPart.rot=0;
     if(arm==="RELAY")newPart.relayType="SPDT";
     if(arm==="APP"){newPart.appConnector="6";newPart.appFault="NORMAL";newPart.limpMode=false;}
@@ -1979,6 +2199,7 @@ function componentBranches(p){
   if(p.type==="BUZZ")return [[P+"+",P+"-",loadResistance(p,400)]];
   if(p.type==="BELL")return [[P+"A",P+"B",loadResistance(p,160)]];
   if(p.type==="FAN")return [[P+"A",P+"B",loadResistance(p,80)]];
+  if(p.type==="BATT_ANALYZER")return [[P+"RED",P+"BLACK",analyzerLoadResistance(p)]];
   if(p.type==="RELAY"){
     const branches=[[P+"COIL+",P+"COIL-",relayCoilResistance(p)],[P+"COM",P+"NO",p.energized ? .02 : INF]];
     if(relayType(p)==="SPDT")branches.push([P+"COM",P+"NC",p.energized ? INF : .02]);
@@ -2017,12 +2238,12 @@ function solveDcNetwork(branches){
   const parent={},touch=n=>{if(n&&!parent[n])parent[n]=n;},root=n=>{touch(n);while(parent[n]!==n){parent[n]=parent[parent[n]];n=parent[n];}return n;},join=(a,b)=>{a=root(a);b=root(b);if(a!==b)parent[b]=a;};
   touch("CHASSIS");S().wires.forEach(w=>{touch(w.a);touch(w.b);join(w.a,w.b);});
   branches.forEach(([a,b])=>{touch(a);touch(b);});
-  S().parts.forEach(p=>{const P=p.id+".";if(p.type==="BATT"||p.type==="PSU"){touch(P+"+");touch(P+"-");}if(p.type==="GND")touch(P+"G");if(p.type==="ECU"){["VREF","GND-S","B+"].forEach(x=>touch(P+x));}});
+ S().parts.forEach(p=>{const P=p.id+".";if(isBattery(p)||p.type==="PSU"){const pos=p.type==="FLA_BATT"?"POS":"+",neg=p.type==="FLA_BATT"?"NEG":"-";touch(P+pos);touch(P+neg);}if(p.type==="GND")touch(P+"G");if(p.type==="ECU"){["VREF","GND-S","B+"].forEach(x=>touch(P+x));}});
   Object.keys(parent).forEach(root);
   const fixed={},setFixed=(n,v)=>{n=root(n);if(fixed[n]===undefined)fixed[n]=v;};
   setFixed("CHASSIS",0);
   S().parts.forEach(p=>{const P=p.id+".";if(!componentEnabled(p))return;
-    if(p.type==="BATT"&&!p.damaged){setFixed(P+"-",0);setFixed(P+"+",batteryTerminalVoltage(p));}
+    if(isBattery(p)&&!p.damaged){const pos=p.type==="FLA_BATT"?"POS":"+",neg=p.type==="FLA_BATT"?"NEG":"-";setFixed(P+neg,0);setFixed(P+pos,batteryTerminalVoltage(p));}
     if(p.type==="PSU"&&!p.damaged){setFixed(P+"-",0);setFixed(P+"+",Math.max(0,+p.val||0));}
     /* AC participates in the netlist with its signed instantaneous sine
        voltage.  A bridge therefore forward-biases the opposite diode pair on
@@ -2049,7 +2270,7 @@ function wireNodeSet(start){
 }
 function batteryLiveData(p,branches,V){
  if(!componentEnabled(p)){p.outputCurrent=0;p.actualVoltage=0;p.actualCurrent=0;p.actualPower=0;p.currentLimited=false;return {voltage:0,current:0,power:0,soc:batterySoc(p),remainingAh:batteryRemainingAh(p)};}
- const P=p.id+".+",positiveNet=wireNodeSet(P);let current=0;
+ const positivePin=p.type==="FLA_BATT"?"POS":"+",P=p.id+"."+positivePin,positiveNet=wireNodeSet(P);let current=0;
  branches.forEach(([a,b,r])=>{
    if(!isFinite(r)||r<=0)return;
    const aOn=positiveNet.has(a),bOn=positiveNet.has(b);if(aOn===bOn)return;
@@ -2075,7 +2296,7 @@ function advanceSimulation(){
  const now=performance.now();if(!lastBatteryTick){lastBatteryTick=now;return false;}
  const dt=Math.min(.25,Math.max(0,(now-lastBatteryTick)/1000));lastBatteryTick=now;if(!dt)return false;
  let topologyChanged=false;
- S().parts.filter(p=>p.type==="BATT"&&componentEnabled(p)&&!p.damaged&&!batteryIsEmpty(p)).forEach(p=>{
+ S().parts.filter(p=>isBattery(p)&&componentEnabled(p)&&!p.damaged&&!batteryIsEmpty(p)).forEach(p=>{
   const before=batteryRemainingAh(p),used=Math.max(0,Number(p.outputCurrent)||0)*dt*BATTERY_SIM_SECONDS_PER_REAL_SECOND/3600;
   p.remainingAh=Math.max(0,before-used);
   if(p.remainingAh<=.000001){
@@ -2159,7 +2380,7 @@ function reachesThroughResistor(adj,start,end){
 function electricalSources(){
  const out=[];
  S().parts.forEach(p=>{if(p.damaged||!componentEnabled(p))return;const P=p.id+".";
-   if(p.type==="BATT"||p.type==="PSU")out.push({plus:P+"+",minus:P+"-"});
+   if(isBattery(p)||p.type==="PSU"){const pos=p.type==="FLA_BATT"?"POS":"+",neg=p.type==="FLA_BATT"?"NEG":"-";out.push({plus:P+pos,minus:P+neg});}
    if(p.type==="AC")out.push({plus:P+"A",minus:P+"B"});
    if(p.type==="ECU"){out.push({plus:P+"VREF",minus:P+"GND-S"});out.push({plus:P+"B+",minus:P+"GND-S"});}
  });
@@ -2197,7 +2418,9 @@ function starterLiveData(p,V){
  return {mode,sVoltage,motorVoltage,solenoidCurrent,motorCurrent,rpm,power:p.actualPower,engaged:!!p.solenoidEngaged,spinning:!!p.motorSpinning,overload:!!p.overload};
 }
 function livePartTooltip(p){
- if(p.type==="BATT")return `แบตเตอรี่ ${batteryNominalVoltage(p)} V • ${batteryCapacityDisplay(p)} ${batteryCapacityUnit(p)}\nแรงดันขณะจ่าย: ${fmtV(p.actualVoltage||0)} • กระแส: ${fmtmA(p.outputCurrent||0)}\nเหลือ ${fmtAh(batteryRemainingAh(p))} (${batterySoc(p).toFixed(1)}%)${batteryIsEmpty(p)?"\nสถานะ: พลังงานหมด — วงจรเปิด":""}`;
+ if(isBattery(p)){const flooded=isFloodedBattery(p),eye=flooded?floodedMagicEye(p):null;
+  return `${flooded?"แบตเตอรี่ตะกั่วกรด":"แบตเตอรี่"} ${batteryNominalVoltage(p)} V • ${batteryCapacityDisplay(p)} ${batteryCapacityUnit(p)}\nแรงดันขณะจ่าย: ${fmtV(p.actualVoltage||0)} • กระแส: ${fmtmA(p.outputCurrent||0)}\nเหลือ ${fmtAh(batteryRemainingAh(p))} (${batterySoc(p).toFixed(1)}%)${flooded?`\nตาแมว: ${eye.label} • น้ำกลั่น ${floodedWaterLevel(p).toFixed(0)}% • CCA ${floodedEffectiveCca(p)}`:""}${batteryIsEmpty(p)?"\nสถานะ: พลังงานหมด — วงจรเปิด":""}`;}
+ if(p.type==="BATT_ANALYZER")return `เครื่องทดสอบแบตเตอรี่ดิจิทัล\n${p.powered?`คีบต่อกับ ${p.connectedBatteryId} • ${fmtV(p.clampVoltage||0)}`:"รอคีบ RED → POS และ BLACK → NEG"}\n${p.analyzerResult?.verdict||"กด ENTER เพื่อวิเคราะห์"}`;
  if(p.type==="RES")return `ตัวต้านทาน ${formatResistance(resistorResistance(p))} ±${resistorTolerance(p)}%\n${resistorBandLabel(p)}\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)} • ${fmtW(p.actualPower||0)}\nพิกัด: ${fmtW(resistorRatedPower(p))}${p.damaged?"\nสถานะ: ไหม้ / วงจรเปิด":""}`;
  if(p.type==="LEDp"){const s=ledSpec(p);return `LED ${s.name}\nVf ${fmtV(s.vf)} • Imax ${fmtmA(s.imax)}\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)}\n${p.damaged?"สถานะ: ขาด / วงจรเปิด":p.currentLimited?"มีตัวต้านทานจำกัดกระแส":"ยังไม่พบตัวต้านทานจำกัดกระแส"}`;}
  if(p.type==="BULB"){const rv=bulbRatedVoltage(p),rw=bulbRatedPower(p);return `หลอดไฟ ${fmtV(rv)} / ${fmtW(rw)}\nR = ${bulbResistance(p).toFixed(1)} Ω\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)} • ${fmtW(p.actualPower||0)}\n${p.damaged?"สถานะ: ไส้ขาด / วงจรเปิด":"Tolerance แรงดัน +18%"}`;}
@@ -2253,16 +2476,18 @@ function showToast(message){
 /* ลัดวงจร = ทางต้านทานต่ำระหว่างขั้วแหล่งจ่าย; อุปกรณ์ป้องกันจะทำงานก่อนแบตเตอรี่/PSU เสีย */
 function detectElectricalFaults(R){
   if(!running)return false;
- const sources=S().parts.filter(p=>(p.type==="BATT"||p.type==="PSU"||p.type==="AC")&&componentEnabled(p)&&!p.damaged&&(p.type!=="BATT"||!batteryIsEmpty(p)));
+ const sources=S().parts.filter(p=>(isBattery(p)||p.type==="PSU"||p.type==="AC")&&componentEnabled(p)&&!p.damaged&&(!isBattery(p)||!batteryIsEmpty(p)));
   for(const source of sources){
-    const P=source.id+".",pins=source.type==="AC"?["A","B"]:["+","-"],r=pathResistance(R,P+pins[0],P+pins[1]);
+    const P=source.id+".",pins=source.type==="AC"?["A","B"]:source.type==="FLA_BATT"?["POS","NEG"]:["+","-"],r=pathResistance(R,P+pins[0],P+pins[1]);
     if(r===undefined||!isFinite(r)||r>.35)continue;
     /* A cranking starter is intentionally a ~0.1 Ω high-current load, not a
        short circuit.  Keep normal starter operation from blowing the source. */
     const normalStarterLoad=S().parts.some(p=>p.type==="STARTER"&&p.motorCircuitOn&&
       branchIsInPath(R,P+pins[0],P+pins[1],p.id+".B",p.id+".GND",starterMotorLoadResistance(p),r));
-    if(normalStarterLoad)continue;
-    const volts=source.type==="BATT"?batteryTerminalVoltage(source):Math.max(0,+source.val||0),amps=volts/Math.max(.02,r);
+    const normalAnalyzerLoad=S().parts.some(p=>p.type==="BATT_ANALYZER"&&p.loadActive&&
+      branchIsInPath(R,P+pins[0],P+pins[1],p.id+".RED",p.id+".BLACK",analyzerLoadResistance(p),r));
+    if(normalStarterLoad||normalAnalyzerLoad)continue;
+    const volts=isBattery(source)?batteryTerminalVoltage(source):Math.max(0,+source.val||0),amps=volts/Math.max(.02,r);
     const fuse=S().parts.find(p=>p.type==="FUSE2"&&p.on&&branchIsInPath(R,P+pins[0],P+pins[1],p.id+".A",p.id+".B",.05,r));
     if(fuse){fuse.on=false;fuse.blown=true;fuse.damaged=true;registerCircuitFault(`⚠ ตรวจพบการลัดวงจร ~${amps.toFixed(0)} A — ฟิวส์ ${fuse.id} ขาดเพื่อป้องกันวงจร`,fuse);return true;}
     const mcb=S().parts.find(p=>p.type==="MCB"&&p.on&&branchIsInPath(R,P+pins[0],P+pins[1],p.id+".A",p.id+".B",.02,r));
@@ -2281,7 +2506,7 @@ function repairParts(target){
 function solveAll(){
   let V={CHASSIS:0},R={},topologyChanged=false;
   if(!running){S().parts.forEach(p=>{if(["LEDp","BULB","BUZZ","BELL","FAN","STARTER"].includes(p.type))p.lit=false;
-    if(["LEDp","BULB","RES","BATT","STARTER"].includes(p.type)){p.actualVoltage=0;p.actualCurrent=0;p.actualPower=0;}if(p.type==="RELAY")p.energized=false;if(p.type==="STARTER"){p.cranking=false;p.rpm=0;p.motorCurrent=0;p.solenoidCurrent=0;p.startCommanded=false;p.motorCircuitOn=false;p.motorSpinning=false;p.solenoidEngaged=false;p.bendixPosition=0;}});lastBatteryTick=0;PIN_I={};return{V,R,topologyChanged};}
+    if(["LEDp","BULB","RES","BATT","FLA_BATT","STARTER"].includes(p.type)){p.actualVoltage=0;p.actualCurrent=0;p.actualPower=0;}if(p.type==="RELAY")p.energized=false;if(p.type==="STARTER"){p.cranking=false;p.rpm=0;p.motorCurrent=0;p.solenoidCurrent=0;p.startCommanded=false;p.motorCircuitOn=false;p.motorSpinning=false;p.solenoidEngaged=false;p.bendixPosition=0;}});lastBatteryTick=0;PIN_I={};return{V,R,topologyChanged};}
   topologyChanged=advanceSimulation();
   const branches=[];const rebuildBranches=()=>{R={};branches.length=0;const add=([a,b,r])=>{R[k2(a,b)]=r;branches.push([a,b,r]);};
     S().parts.forEach(p=>{componentBranches(p).forEach(add);sensorBranches(p).forEach(add);});
@@ -2327,12 +2552,13 @@ function solveAll(){
    }
    applySensorSignals(V,R);
   };
-  const syncBattery=()=>S().parts.filter(p=>p.type==="BATT").forEach(p=>batteryLiveData(p,branches,V));
+  const syncBattery=()=>S().parts.filter(isBattery).forEach(p=>batteryLiveData(p,branches,V));
   /* รอบแรกใช้ OCV / รอบที่สองใช้กระแสที่คำนวณได้ จึงเห็น voltage sag ตามโหลดจริง */
   stabilize();syncBattery();
-  if(S().parts.some(p=>p.type==="BATT")){stabilize();syncBattery();}
+  if(S().parts.some(isBattery)){stabilize();syncBattery();}
   if(detectElectricalFaults(R)){topologyChanged=true;stabilize();syncBattery();}
   if(detectLoadBurnout(V)){topologyChanged=true;stabilize();syncBattery();}
+  syncBatteryAnalyzers(V);
   const powered=(p,a,b,min)=>!p.damaged&&Math.abs((V[p.id+"."+a]??0)-(V[p.id+"."+b]??0))>=min;
   S().parts.forEach(p=>{if(p.type==="LEDp"){const d=ledLiveData(p,V);p.lit=!p.damaged&&d.voltage>=d.spec.vf*.65&&d.current>.001;}
     if(p.type==="BULB"){const d=bulbLiveData(p,V);p.lit=!p.damaged&&d.voltage>=d.ratedV*.65;}
@@ -2974,7 +3200,7 @@ function updateStatus(){
   return;
  }
  $("btnRepair").classList.remove("act");
- const emptyBatteries=S().parts.filter(p=>p.type==="BATT"&&batteryIsEmpty(p));
+ const emptyBatteries=S().parts.filter(p=>isBattery(p)&&batteryIsEmpty(p));
  if(emptyBatteries.length){h.className="bad";
   h.textContent=`🔋 พลังงานแบตเตอรี่หมด (0%) — วงจรหยุดทำงานแล้ว กดปุ่ม “↻ ชาร์จใหม่” ที่ลอยอยู่บนแบตเตอรี่เพื่อชาร์จเต็มและเริ่มวงจรใหม่`;
   $("sideStat").innerHTML=`<div style="color:#b42318;font-weight:700">🔋 แบตเตอรี่หมด:</div>`+emptyBatteries.map(p=>`🔴 ${p.id} — 0% / 0 V`).join("<br>");
@@ -2986,8 +3212,8 @@ function updateStatus(){
    `⚪ ${DEF[p.type].nm}`).join("<br>")||"—";return;}
  const isTrainingCircuit=!!ecu||sens.length>0;
  if(!isTrainingCircuit){
-  const sources=S().parts.filter(p=>["BATT","PSU","AC"].includes(p.type));
-  const passiveParts=S().parts.filter(p=>!["BATT","PSU","AC","GND"].includes(p.type));
+  const sources=S().parts.filter(p=>isBattery(p)||["PSU","AC"].includes(p.type));
+  const passiveParts=S().parts.filter(p=>!isBattery(p)&&!["PSU","AC","GND"].includes(p.type));
   const sourcePins=new Set(sources.flatMap(p=>pinsFor(p).map(pin=>p.id+"."+pin[0])));
   const hasSourceWire=S().wires.some(w=>sourcePins.has(w.a)||sourcePins.has(w.b));
   if(!sources.length){h.className="bad";h.textContent="วางแหล่งจ่ายไฟ แล้วลากสายจากขั้วของอุปกรณ์เพื่อเริ่มต่อวงจร";}
@@ -3059,18 +3285,37 @@ function buildInspector(){
     Bendix: <b id="starterBendix" style="color:${p.solenoidEngaged?"#0a7d3f":"#6b7784"}">${p.solenoidEngaged?"ดันออก / ขบเฟือง":"หดกลับ"}</b><br>
     สถานะ: <b id="starterState" style="color:${p.overload?"#b42318":p.motorSpinning?"#0a7d3f":"#6b7784"}">${p.overload?"⚠ โหลดเกิน / Locked Rotor":p.motorSpinning?"กำลังหมุน":"รอไฟ S, B และ GND"}</b></div></div>`;
  }
- if(p.type==="BATT"){
-  const capValue=batteryCapacityDisplay(p),unit=batteryCapacityUnit(p);
-  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">การจำลองแบตเตอรี่</div>
-   <div class="fld"><label>แรงดันตั้งต้น</label><input id="battVoltage" type="number" min="1" max="96" step="0.1" value="${batteryNominalVoltage(p)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>V</b></div>
+ if(isBattery(p)){
+  const capValue=batteryCapacityDisplay(p),unit=batteryCapacityUnit(p),flooded=isFloodedBattery(p),fault=floodedBatteryFault(p),eye=floodedMagicEye(p),maxCurrent=flooded?floodedRatedCca(p):batteryMaxCurrent(p);
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">${flooded?"แบตเตอรี่ตะกั่วกรด / Flooded":"การจำลองแบตเตอรี่"}</div>
+   <div class="fld"><label>แรงดันตั้งต้น</label><input id="battVoltage" type="number" min="${flooded?10.5:1}" max="${flooded?13.2:96}" step="0.1" value="${batteryNominalVoltage(p)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>V</b></div>
    <div class="fld"><label>ความจุ</label><input id="battCapacity" type="number" min="0.01" max="10000000" step="any" value="${capValue}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><select id="battUnit" style="max-width:70px"><option value="Ah" ${unit==="Ah"?"selected":""}>Ah</option><option value="mAh" ${unit==="mAh"?"selected":""}>mAh</option></select></div>
-   <div class="fld"><label>กระแสสูงสุด</label><input id="battMaxCurrent" type="number" min="0.1" max="5000" step="0.1" value="${batteryMaxCurrent(p)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>A / CCA</b></div>
-   <div style="font-size:11px;color:#5c6874;line-height:1.65;border-top:1px solid #eef1f5;padding-top:6px">แรงดันขณะจ่าย: <b id="battActualV">${fmtV(p.actualVoltage||0)}</b><br>
+   <div class="fld"><label>${flooded?"พิกัดกระแสสตาร์ท CCA":"กระแสสูงสุด"}</label><input id="battMaxCurrent" type="number" min="${flooded?300:.1}" max="${flooded?800:5000}" step="${flooded?1:.1}" value="${maxCurrent}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>A / CCA</b></div>
+   ${flooded?`<div class="fld"><label>R ภายใน (ค่าปกติ)</label><input id="floodedRi" type="number" min="3" max="5" step="0.1" value="${(floodedBaseResistance(p)*1000).toFixed(1)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>mΩ</b></div>
+   <div class="fld"><label>อาการจำลอง</label><select id="floodedFault">${Object.entries(FLOODED_BATTERY_FAULTS).map(([key,data])=>`<option value="${key}" ${fault===key?"selected":""}>${data.label}</option>`).join("")}</select></div>
+   <div style="font-size:10.5px;color:#5c6874;line-height:1.55;padding:6px 7px;border-radius:6px;background:#f4f7f9">ตาแมว: <b id="floodedEyeText" style="color:${eye.key==="green"?"#087a3f":eye.key==="clear"?"#b42318":"#30363d"}">${eye.label}</b><br>ระดับน้ำกลั่น: <b id="floodedWater">${floodedWaterLevel(p).toFixed(0)}%</b> • Ri จริง: <b id="floodedLiveRi">${(batteryInternalResistance(p)*1000).toFixed(1)} mΩ</b><br>CCA ที่คาดวัดได้: <b id="floodedEffectiveCca">${floodedEffectiveCca(p)} CCA</b><br><span id="floodedFaultDetail">${FLOODED_BATTERY_FAULTS[fault].detail}</span></div>
+   <button class="tb" id="btnRefillWater" type="button" style="margin-top:7px;padding:5px 8px">💧 เติมน้ำกลั่น 100%</button>`:""}
+   <div style="font-size:11px;color:#5c6874;line-height:1.65;border-top:1px solid #eef1f5;padding-top:6px;margin-top:7px">แรงดันขณะจ่าย: <b id="battActualV">${fmtV(p.actualVoltage||0)}</b><br>
     กระแสที่จ่าย: <b id="battActualI">${fmtmA(p.outputCurrent||0)}</b> ${p.currentLimited?"<span style='color:#b54708'>(เกินขีดจำกัด)</span>":""}<br>
     กำลังขาออก: <b id="battActualP">${fmtW(p.actualPower||0)}</b><br>
     ความจุคงเหลือ: <b id="battRemaining">${batteryRemainingDisplay(p)}</b><br>
     SOC: <b id="battSoc">${batterySoc(p).toFixed(1)}%</b> • OCV <b id="battOcv">${fmtV(batteryOpenVoltage(p))}</b></div>
-   <div class="fld" style="margin-bottom:0;align-items:center;gap:7px"><button class="tb" id="battRecharge" type="button" title="คืนความจุแบตเตอรี่เป็น 100%" style="padding:5px 8px;white-space:nowrap">↻ รีเซ็ตแบตเตอรี่</button><span id="battState" style="font-size:10.5px;color:${batteryIsEmpty(p)?"#b42318":"#0a7d3f"}">${batteryIsEmpty(p)?"แบตหมด — กดรีเซ็ตเพื่อชาร์จเต็ม":"พร้อมจ่ายไฟ"}</span></div></div>`;
+   <div class="fld" style="margin:7px 0 0;align-items:center;gap:7px"><button class="tb" id="battRecharge" type="button" title="คืนความจุแบตเตอรี่เป็น 100%" style="padding:5px 8px;white-space:nowrap">↻ รีเซ็ตแบตเตอรี่</button><span id="battState" style="font-size:10.5px;color:${batteryIsEmpty(p)?"#b42318":"#0a7d3f"}">${batteryIsEmpty(p)?"แบตหมด — กดรีเซ็ตเพื่อชาร์จเต็ม":"พร้อมจ่ายไฟ"}</span></div></div>`;
+ }
+ if(p.type==="BATT_ANALYZER"){
+  const powered=!!p.powered,result=p.analyzerResult,connected=p.connectedBatteryId||"—",verdict=result?.verdict||"รอเริ่มทดสอบ",menuStep=analyzerMenuStep(p);
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">เครื่องทดสอบแบตเตอรี่ดิจิทัล</div>
+   <div style="font-size:10.5px;line-height:1.45;color:#5c6874;margin:-2px 0 7px">เมนูเครื่องจริง: <b>${menuStep<4?`ขั้น ${menuStep+1}/4 — ${ANALYZER_MENU_STEPS[menuStep]}`:"แสดงผลการทดสอบ"}</b><br>ใช้ปุ่มบนตัวเครื่อง: UP/DOWN เลือกค่า • ENTER ถัดไป/ทดสอบ • BACK ย้อนกลับ</div>
+   <div class="fld"><label>ตำแหน่งทดสอบ</label><select id="analyzerLocation"><option value="IN" ${p.analyzerLocation!=="OUT"?"selected":""}>In-Vehicle</option><option value="OUT" ${p.analyzerLocation==="OUT"?"selected":""}>Out-of-Vehicle</option></select></div>
+   <div class="fld"><label>ชนิดแบตเตอรี่</label><select id="analyzerBatteryType"><option value="FLOODED" ${p.analyzerBatteryType!=="AGM"&&p.analyzerBatteryType!=="GEL"?"selected":""}>Regular Flooded</option><option value="AGM" ${p.analyzerBatteryType==="AGM"?"selected":""}>AGM</option><option value="GEL" ${p.analyzerBatteryType==="GEL"?"selected":""}>GEL</option></select></div>
+   <div class="fld"><label>มาตรฐาน</label><select id="analyzerStandard">${["CCA","JIS","EN","DIN","SAE","IEC"].map(x=>`<option value="${x}" ${p.analyzerStandard===x?"selected":""}>${x}</option>`).join("")}</select></div>
+   <div class="fld"><label>Rated CCA</label><button class="tb" id="analyzerDown" type="button" style="padding:4px 7px">▼</button><input id="analyzerRatedCca" type="number" min="100" max="1000" step="25" value="${analyzerRatedCca(p)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><button class="tb" id="analyzerUp" type="button" style="padding:4px 7px">▲</button><b>CCA</b></div>
+   <div class="fld"><label>Ripple จำลอง</label><input id="analyzerRipple" type="number" min="0" max="2" step="0.01" value="${Math.max(0,Number(p.chargingRipple)||.08).toFixed(2)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>V</b></div>
+   <div class="fld"><label>แรงดันระบบชาร์จจำลอง</label><input id="analyzerChargeVoltage" type="number" min="10" max="16" step="0.1" value="${Math.max(10,Math.min(16,Number(p.simChargeVoltage)||13.8)).toFixed(1)}" style="width:100%;border:1px solid #ccd4de;border-radius:6px;padding:5px;font-family:Consolas"><b>V</b></div>
+   <button class="tb" id="analyzerEngine" type="button" style="padding:5px 8px;margin:-2px 0 7px">${p.engineRunning?"⏹ หยุดจำลองเครื่องยนต์":"⏻ จำลองเครื่องยนต์ทำงาน"}</button>
+   <div style="font-size:10.5px;line-height:1.58;padding:7px;border-radius:6px;background:${powered?"#e7f8ec":"#fff7e8"};color:${powered?"#087a3f":"#9a5b00"}">สถานะคีบสาย: <b id="analyzerClampState">${powered?`พร้อม — ${connected}`:"รอคีบ RED → POS และ BLACK → NEG"}</b><br>แรงดันที่คีบ: <b id="analyzerClampV">${fmtV(p.clampVoltage||0)}</b><br>Cranking: <b id="analyzerCrank">${p.crankStatus||"รอ START"}</b> ${Number.isFinite(p.crankMin)?`(<span id="analyzerCrankV">${fmtV(p.crankMin)}</span>)`:""}<br>Charging: <b id="analyzerCharge">${p.chargeStatus||"รอระบบชาร์จ"}</b> (<b id="analyzerChargeV">${fmtV(p.chargeVoltage||0)}</b>) • Ripple <b id="analyzerRippleLive">${(p.chargeRipple||.08).toFixed(2)} V</b></div>
+   <div id="analyzerResult" style="font-size:11px;line-height:1.55;margin-top:7px;padding:7px;border-radius:6px;background:${result?.verdict?.includes("REPLACE")?"#fff0ef":"#f4f7f9"};color:${result?.verdict?.includes("REPLACE")?"#b42318":"#344454"}">${p.testing?"🔄 TESTING...":result?`<b>${verdict}</b><br>SOC ${result.soc}% • SOH ${result.soh.toFixed(0)}% • Measured ${result.cca} CCA<br>OCV ${fmtV(result.ocv)} • Ri ${(result.ri*1000).toFixed(1)} mΩ<br>Load ${Number(result.loadCurrent)||0} A: ${fmtV(result.loadVoltage||0)}`:"กด ENTER เพื่อวิเคราะห์ SOH / SOC / CCA"}</div>
+   <div style="display:flex;gap:6px;margin-top:7px"><button class="tb" id="analyzerEnter" type="button" style="padding:5px 8px">ENTER — เริ่มทดสอบ</button><button class="tb" id="analyzerBack" type="button" style="padding:5px 8px">BACK — ล้างผล</button></div></div>`;
  }
  if(p.type==="RES"){
   const bands=resistorBandSet(p),count=bands.length,ratio=(Number(p.actualPower)||0)/resistorRatedPower(p);
@@ -3165,14 +3410,15 @@ function buildInspector(){
  };
  if($("battVoltage")){
   const voltage=$("battVoltage"),capacity=$("battCapacity"),maxCurrent=$("battMaxCurrent"),unit=$("battUnit");
+  const flooded=isFloodedBattery(p);
   const finiteInput=(el,fallback)=>{const text=el.value.trim(),value=Number(text);return text!==""&&Number.isFinite(value)?value:fallback;};
-  const syncBatteryInputs=()=>{voltage.value=batteryNominalVoltage(p);capacity.value=batteryCapacityDisplay(p);maxCurrent.value=batteryMaxCurrent(p);unit.value=batteryCapacityUnit(p);};
+  const syncBatteryInputs=()=>{voltage.value=batteryNominalVoltage(p);capacity.value=batteryCapacityDisplay(p);maxCurrent.value=flooded?floodedRatedCca(p):batteryMaxCurrent(p);unit.value=batteryCapacityUnit(p);};
   const saveBattery=(finish=false)=>{
    const nextUnit=unit.value==="mAh"?"mAh":"Ah";
-   const nextVoltage=Math.max(1,Math.min(96,finiteInput(voltage,batteryNominalVoltage(p))));
+   const nextVoltage=Math.max(flooded?10.5:1,Math.min(flooded?13.2:96,finiteInput(voltage,batteryNominalVoltage(p))));
    const nextCapacity=Math.max(.01,finiteInput(capacity,batteryCapacityDisplay(p)));
-   const nextMax=Math.max(.1,Math.min(5000,finiteInput(maxCurrent,batteryMaxCurrent(p))));
-   const unchanged=nextUnit===batteryCapacityUnit(p)&&Math.abs(nextVoltage-batteryNominalVoltage(p))<1e-9&&Math.abs(nextCapacity-batteryCapacityDisplay(p))<1e-9&&Math.abs(nextMax-batteryMaxCurrent(p))<1e-9;
+   const nextMax=Math.max(flooded?300:.1,Math.min(flooded?800:5000,finiteInput(maxCurrent,flooded?floodedRatedCca(p):batteryMaxCurrent(p))));
+   const unchanged=nextUnit===batteryCapacityUnit(p)&&Math.abs(nextVoltage-batteryNominalVoltage(p))<1e-9&&Math.abs(nextCapacity-batteryCapacityDisplay(p))<1e-9&&Math.abs(nextMax-(flooded?floodedRatedCca(p):batteryMaxCurrent(p)))<1e-9;
    if(!unchanged||inspectorEdit)applyInspectorEdit(p,"battery-settings",()=>{
     /* Preserve the charge percentage, not an obsolete Ah value, whenever the
        rated capacity/unit is edited. */
@@ -3184,10 +3430,23 @@ function buildInspector(){
    if(finish){syncBatteryInputs();finishInspectorEdit(p,"battery-settings");}
   };
   [voltage,capacity,maxCurrent].forEach(el=>{el.addEventListener("input",()=>saveBattery());el.addEventListener("change",()=>saveBattery(true));el.addEventListener("blur",()=>finishInspectorEdit(p,"battery-settings"));});
-  unit.onchange=()=>{const physicalCapacity=batteryCapacityAh(p),oldSoc=batterySoc(p);finishInspectorEdit(p,"battery-settings");snap();
+ unit.onchange=()=>{const physicalCapacity=batteryCapacityAh(p),oldSoc=batterySoc(p);finishInspectorEdit(p,"battery-settings");snap();
    p.battCapacityUnit=unit.value==="mAh"?"mAh":"Ah";p.battCapacity=p.battCapacityUnit==="mAh"?physicalCapacity*1000:physicalCapacity;
    p.remainingAh=physicalCapacity*oldSoc/100;render();};
  if($("battRecharge"))$("battRecharge").onclick=()=>rechargeBattery(p);
+ if($("floodedRi"))$("floodedRi").onchange=e=>{const value=Math.max(3,Math.min(5,Number(e.target.value)||4));snap();p.floodedRiMOhm=value;render();};
+ if($("floodedFault"))$("floodedFault").onchange=e=>{snap();setFloodedBatteryFault(p,e.target.value);render();};
+ if($("btnRefillWater"))$("btnRefillWater").onclick=()=>refillDistilledWater(p);
+ }
+ if($("analyzerLocation"))$("analyzerLocation").onchange=e=>{snap();p.analyzerLocation=e.target.value==="OUT"?"OUT":"IN";p.analyzerResult=null;render();};
+ if($("analyzerBatteryType"))$("analyzerBatteryType").onchange=e=>{snap();p.analyzerBatteryType=["AGM","GEL"].includes(e.target.value)?e.target.value:"FLOODED";p.analyzerResult=null;render();};
+ if($("analyzerStandard"))$("analyzerStandard").onchange=e=>{snap();p.analyzerStandard=["CCA","JIS","EN","DIN","SAE","IEC"].includes(e.target.value)?e.target.value:"CCA";p.analyzerResult=null;render();};
+ if($("analyzerRatedCca")){
+  const rated=$("analyzerRatedCca"),ripple=$("analyzerRipple"),chargeVoltage=$("analyzerChargeVoltage"),saveAnalyzer=(finish=false)=>{const value=Math.max(100,Math.min(1000,Number(rated.value)||600)),nextRipple=Math.max(0,Math.min(2,Number(ripple.value)||0)),nextCharge=Math.max(10,Math.min(16,Number(chargeVoltage.value)||13.8));
+   applyInspectorEdit(p,"analyzer-settings",()=>{p.analyzerRatedCca=value;p.chargingRipple=nextRipple;p.simChargeVoltage=nextCharge;p.analyzerResult=null;});if(finish){rated.value=value;ripple.value=nextRipple.toFixed(2);chargeVoltage.value=nextCharge.toFixed(1);finishInspectorEdit(p,"analyzer-settings");}};
+  [rated,ripple,chargeVoltage].forEach(el=>{el.addEventListener("input",()=>saveAnalyzer());el.addEventListener("change",()=>saveAnalyzer(true));el.addEventListener("blur",()=>finishInspectorEdit(p,"analyzer-settings"));});
+  $("analyzerUp").onclick=()=>analyzerControl(p,"up");$("analyzerDown").onclick=()=>analyzerControl(p,"down");$("analyzerEnter").onclick=()=>analyzerControl(p,"enter");$("analyzerBack").onclick=()=>analyzerControl(p,"back");
+  $("analyzerEngine").onclick=()=>{snap();p.engineRunning=!p.engineRunning;render();};
  }
  if($("btnRotateDiode"))$("btnRotateDiode").onclick=()=>{snap();p.rot=(diodeRotation(p)+45)%360;render();};
  if($("resBandCount")){
@@ -3246,16 +3505,23 @@ function updateBatteryVisuals(){
  document.querySelectorAll(".battery-level").forEach(el=>{const p=findP(el.dataset.batteryId);if(!p)return;
   const soc=batterySoc(p),level=14*soc/100;el.setAttribute("y",21-level);el.setAttribute("height",level);el.setAttribute("fill",batteryLevelColor(soc));
  });
+ document.querySelectorAll(".flooded-magic-eye").forEach(el=>{const p=findP(el.dataset.batteryId);if(!isFloodedBattery(p))return;const eye=floodedMagicEye(p);el.setAttribute("fill",eye.color);el.setAttribute("stroke",eye.stroke);});
 }
 function updateLivePropertyPanel(){
  updateBatteryVisuals();
  const p=sel&&findP(sel);if(!p)return;
  const set=(id,text)=>{const el=$(id);if(el)el.textContent=text;};
- if(p.type==="BATT"){
+ if(isBattery(p)){
   set("battActualV",fmtV(p.actualVoltage||0));set("battActualI",fmtAmpsLabel(p.outputCurrent||0));set("battActualP",fmtW(p.actualPower||0));
   set("battRemaining",batteryRemainingDisplay(p));set("battSoc",`${batterySoc(p).toFixed(1)}%`);set("battOcv",fmtV(batteryOpenVoltage(p)));
   const state=$("battState");if(state){state.style.color=batteryIsEmpty(p)?"#b42318":p.currentLimited?"#b54708":"#0a7d3f";
    state.textContent=batteryIsEmpty(p)?"แบตหมด — วงจรถูกตัด":p.currentLimited?"กระแสเกินขีดจำกัด — แรงดันตก":"พร้อมจ่ายไฟ";}
+  if(isFloodedBattery(p)){const eye=floodedMagicEye(p),eyeText=$("floodedEyeText");set("floodedWater",`${floodedWaterLevel(p).toFixed(0)}%`);set("floodedLiveRi",`${(batteryInternalResistance(p)*1000).toFixed(1)} mΩ`);set("floodedEffectiveCca",`${floodedEffectiveCca(p)} CCA`);set("floodedFaultDetail",FLOODED_BATTERY_FAULTS[floodedBatteryFault(p)].detail);
+   if(eyeText){eyeText.textContent=eye.label;eyeText.style.color=eye.key==="green"?"#087a3f":eye.key==="clear"?"#b42318":"#30363d";}}
+ }
+ if(p.type==="BATT_ANALYZER"){
+  const result=p.analyzerResult,powered=!!p.powered;set("analyzerClampState",powered?`พร้อม — ${p.connectedBatteryId||"แบตเตอรี่"}`:"รอคีบ RED → POS และ BLACK → NEG");set("analyzerClampV",fmtV(p.clampVoltage||0));set("analyzerCrank",p.crankStatus||"รอ START");set("analyzerCharge",p.chargeStatus||"รอระบบชาร์จ");set("analyzerChargeV",fmtV(p.chargeVoltage||0));set("analyzerRippleLive",`${(p.chargeRipple||.08).toFixed(2)} V`);
+  const resultBox=$("analyzerResult");if(resultBox){resultBox.style.background=result?.verdict?.includes("REPLACE")?"#fff0ef":"#f4f7f9";resultBox.style.color=result?.verdict?.includes("REPLACE")?"#b42318":"#344454";resultBox.innerHTML=p.testing?"🔄 TESTING...":result?`<b>${result.verdict}</b><br>SOC ${result.soc}% • SOH ${result.soh.toFixed(0)}% • Measured ${result.cca} CCA<br>OCV ${fmtV(result.ocv)} • Ri ${(result.ri*1000).toFixed(1)} mΩ<br>Load ${Number(result.loadCurrent)||0} A: ${fmtV(result.loadVoltage||0)}`:"กด ENTER เพื่อวิเคราะห์ SOH / SOC / CCA";}
  }
  if(p.type==="IGN"){
   const stage=ignitionStage(p),state=$("ignitionState"),outputs=$("ignitionOutputs");
@@ -3325,6 +3591,10 @@ function updateDynamicCanvas(V){
    set(".bulb-glow",{r:10+glow*11,fill:filament,opacity:glow>.02?.06+.17*glow:0});
    set(".bulb-glass",{fill:p.damaged?"#252a30":glow>.02?filament:"#e9e6d8"});set(".bulb-filament",{stroke:p.damaged?"#77808a":filament,"stroke-width":1+glow});set(".bulb-lit-glow",{opacity:p.lit?.35:0});
   }
+ });
+ S().parts.filter(p=>p.type==="BATT_ANALYZER").forEach(p=>{
+  const lines=analyzerScreenLines(p),main=partL.querySelector(`.analyzer-lcd-main[data-analyzer-id="${p.id}"]`),sub=partL.querySelector(`.analyzer-lcd-sub[data-analyzer-id="${p.id}"]`);
+  if(main)main.textContent=lines.main;if(sub)sub.textContent=lines.sub;
  });
  const now=performance.now();
  S().parts.filter(p=>p.type==="STARTER").forEach(p=>{
