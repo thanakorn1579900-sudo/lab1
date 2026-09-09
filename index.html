@@ -690,6 +690,16 @@ const APP_PINS_9=[
  ["VREF2","Pin 4 VREF2 5V Sub","#e06c75"],["GND2","Pin 5 GND2 E2","#9aa5b1"],["APP2","Pin 6 APP2 Signal 2","#98c379"],
  ["IDLE","Pin 7 IDLE IVS Signal","#f0c36b"],["GND-I","Pin 8 GND-I IVS GND","#9aa5b1"],["NC","Pin 9 NC Shield","#858f9a"]
 ];
+/* TPS is available as the usual 3-terminal potentiometer or a 4-terminal
+   version with an idle-validation switch.  Keeping both pin maps here lets
+   the artwork, wire hit-testing and circuit netlist use exactly the same pins. */
+const TPS_PINS_3=[
+ ["VREF","Pin 1 VREF 5V","#e06c75"],["SIG","Pin 2 SIG Output","#61afef"],["GND","Pin 3 GND Sensor","#9aa5b1"]
+];
+const TPS_PINS_4=[
+ ["VREF","Pin 1 VREF 5V","#e06c75"],["SIG","Pin 2 SIG Output","#61afef"],
+ ["GND","Pin 3 GND Sensor","#9aa5b1"],["IDLE","Pin 4 IDLE Switch","#f0c36b"]
+];
 const DEF={
  ECU:{nm:"ECU กล่องควบคุม",ic:"🖥",w:606,fill:"#38414d",head:"#222a33",
   pins:[["VREF","VREF 5V","#e06c75"],["SIG-A","SIG-A (ECT)","#61afef"],
@@ -704,7 +714,7 @@ const DEF={
  IAT:{nm:"IAT อุณหภูมิอากาศ",ic:"💨",w:150,fill:"#2f4858",head:"#22333f",
   pins:[["SIG","ขา1 SIG","#61afef"],["GND","ขา2 GND","#9aa5b1"]]},
  TPS:{nm:"TPS ลิ้นปีกผีเสื้อ",ic:"🎚",w:150,fill:"#3d3350",head:"#2d2540",
-  pins:[["VREF","ขา1 VREF","#e06c75"],["SIG","ขา2 SIG","#61afef"],["GND","ขา3 GND","#9aa5b1"]]},
+  pins:TPS_PINS_3},
  MAP:{nm:"MAP แรงดันท่อร่วม",ic:"🌀",w:150,fill:"#3d3350",head:"#2d2540",
   pins:[["VREF","ขา1 VREF","#e06c75"],["SIG","ขา2 SIG","#61afef"],["GND","ขา3 GND","#9aa5b1"]]},
  CKP_HALL:{nm:"CKP แบบฮอลล์",ic:"⚙",w:158,fill:"#2f4536",head:"#223228",
@@ -857,7 +867,7 @@ const TOGGLE_LABEL={SW:["ON — วงจรต่อ", "OFF — วงจรเ
  FUSE2:["ปกติ — ฟิวส์ต่อวงจร", "ขาด — ฟิวส์ตัดวงจร"]};
 const ELECTRICAL={
  ECU:"Reference 5.00 V, sensor ground 0.03 V, thermistor pull-up 2.2 kΩ", ECT:"NTC 2 kΩ @ 25°C, β≈3500 K",
- IAT:"NTC 2 kΩ @ 25°C, β≈3500 K", TPS:"รางตัวต้านทาน 2.4 kΩ; output 0.55–4.45 V",
+ IAT:"NTC 2 kΩ @ 25°C, β≈3500 K", TPS:"รางตัวต้านทาน 2.4 kΩ; output 0.55–4.45 V • เลือกได้ 3 ขั้ว หรือ 4 ขั้วพร้อมสวิตช์ IDLE",
  MAP:"เซ็นเซอร์ active 5 V; output ประมาณ 0.30–4.65 V", CKP_HALL:"Active Hall, B+ 13.8 V, output 0–5 V, wheel 60-2",
  CKP_VR:"ขดลวด VR 950 Ω, amplitude เพิ่มตาม rpm, wheel 60-2", MAF:"MAF 5 ขา + IAT: B+ 12 V, VREF 5 V, Flow 0.5–4.5 V",
  O2:"O2 4 ขา: ฮีตเตอร์ประมาณ 8 Ω, สัญญาณ 0.1–0.9 V", CMP_HALL:"CMP Hall 3 ขา, B+ 12 V / signal 0–5 V",
@@ -949,7 +959,7 @@ function powered2(p,pa,pb,HIGH,LOW){
  return (HIGH.has(a)&&LOW.has(b))||(HIGH.has(b)&&LOW.has(a));}
 const NOTE={ECT:"NTC : ยิ่งร้อน ความต้านทานยิ่งต่ำ → แรงดันสัญญาณยิ่งต่ำ",
  IAT:"หลักการเดียวกับ ECT แต่ตอบสนองเร็วกว่าเพราะมวลน้อย",
- TPS:"ปิดสุด ≈0.55V เปิดสุด ≈4.45V ต้องไล่ต่อเนื่อง ไม่กระโดด",
+ TPS:"ปิดสุด ≈0.55V เปิดสุด ≈4.45V ต้องไล่ต่อเนื่อง ไม่กระโดด • แบบ 4 ขั้วมี IDLE ต่อกราวด์เมื่อปล่อยคันเร่ง",
  MAP:"สุญญากาศสูง = แรงดันต่ำ / กุญแจ ON เครื่องดับ ≈4.5V",
  CKP_HALL:"คลื่นสี่เหลี่ยม 0-5V ล้อ 60-2 ฟัน • Active Sensor วัดโอห์มได้ OL",
  CKP_VR:"คลื่นไซน์ แอมป์โตตามรอบ • ขดลวดปกติ 800-1200Ω",
@@ -978,10 +988,16 @@ const REF=[
  ["ECT","แรงดันตกที่กราวด์","V",0,0.03,0.10,"วัดขา 2 เทียบตัวถังรถ"],
  ["IAT","อุณหภูมิ 25°C","R Ω",1900,2000,2200,"ถอดปลั๊ก วัดคร่อมขา 1-2"],
  ["IAT","อุณหภูมิ 25°C","V",2.30,2.38,2.60,"เสียบปลั๊ก วัดขา SIG"],
- ["TPS","คันเร่งปิดสุด","V",0.40,0.55,0.90,"วัดขา SIG เทียบ GND"],
- ["TPS","คันเร่งเปิดสุด","V",4.20,4.45,4.80,"วัดขา SIG เทียบ GND"],
- ["TPS","ไฟเลี้ยง VREF","V",4.80,5.00,5.20,"วัดขา 1 เทียบขา 3"],
- ["TPS","ความต้านทานแทร็ก","R Ω",2000,2400,3000,"ถอดปลั๊ก วัดขา 1-3"],
+ ["TPS","คันเร่งปิดสุด","V",0.40,0.55,0.90,"เสียบปลั๊ก วัด SIG เทียบ GND",["SIG","GND"]],
+ ["TPS","คันเร่งเปิดสุด","V",4.20,4.45,4.80,"เสียบปลั๊ก วัด SIG เทียบ GND",["SIG","GND"]],
+ ["TPS","ไฟเลี้ยง VREF","V",4.80,5.00,5.20,"เสียบปลั๊ก วัด VREF เทียบ GND",["VREF","GND"]],
+ ["TPS","ความต้านทานแทร็กทั้งหมด","R Ω",2000,2400,3000,"ถอดปลั๊ก วัด VREF คร่อม GND",["VREF","GND"]],
+ ["TPS","โอห์ม SIG-GND — คันเร่งปิดสุด","R Ω",200,264,450,"ถอดปลั๊ก ตั้งคันเร่ง 0% แล้ววัด SIG คร่อม GND",["SIG","GND"]],
+ ["TPS","โอห์ม SIG-GND — คันเร่งเปิดสุด","R Ω",1900,2136,2200,"ถอดปลั๊ก ตั้งคันเร่ง 100% แล้ววัด SIG คร่อม GND",["SIG","GND"]],
+ ["TPS","โอห์ม VREF-SIG — คันเร่งปิดสุด","R Ω",1900,2136,2200,"ถอดปลั๊ก ตั้งคันเร่ง 0% แล้ววัด VREF คร่อม SIG",["VREF","SIG"]],
+ ["TPS","โอห์ม VREF-SIG — คันเร่งเปิดสุด","R Ω",200,264,450,"ถอดปลั๊ก ตั้งคันเร่ง 100% แล้ววัด VREF คร่อม SIG",["VREF","SIG"]],
+ ["TPS","สวิตช์ IDLE — ปล่อยคันเร่ง (TPS 4 ขั้ว)","R Ω",0,0,30,"ถอดปลั๊ก วัด IDLE คร่อม GND; ต้องต่อถึงกัน",["IDLE","GND"],"4"],
+ ["TPS","สวิตช์ IDLE — เริ่มเหยียบ (TPS 4 ขั้ว)","OL",Infinity,Infinity,Infinity,"ถอดปลั๊ก วัด IDLE คร่อม GND; ต้องขึ้น OL",["IDLE","GND"],"4"],
  ["MAP","กุญแจ ON เครื่องดับ","V",4.20,4.50,4.80,"วัดขา SIG เทียบ GND"],
  ["MAP","รอบเดินเบา ~30 kPa","V",0.90,1.15,1.50,"วัดขา SIG เทียบ GND"],
  ["CKP_HALL","ไฟเลี้ยง B+","V",11.5,13.8,14.5,"กุญแจ ON วัดขา 3 เทียบตัวถัง"],
@@ -1255,15 +1271,42 @@ const APP_FAULTS={
  APS2_SHORT_BP:"APS / APP2 ช็อตไฟอ้างอิง — 5 V",
  MISMATCH:"สัญญาณคู่ไม่สัมพันธ์กัน — Signal mismatch"
 };
+/* TPS-specific faults are separate from the shared fault toolbar.  A teacher
+   can therefore demonstrate a wiper/supply/idle-switch defect without
+   changing the wiring or losing the generic Open/Short demonstrations. */
+const TPS_FAULTS={
+ NORMAL:{label:"ปกติ — สัญญาณไล่ต่อเนื่อง",detail:"SIG เปลี่ยนต่อเนื่อง 0.55–4.45 V ตามตำแหน่งคันเร่ง",dtc:""},
+ SIG_OPEN:{label:"สายสัญญาณ / Wiper ขาด",detail:"SIG ลอยสูงใกล้ 5 V; วัดโอห์มจาก SIG ไปขาอื่นได้ OL",dtc:"P0122/P0123 — TPS signal circuit"},
+ SIG_SHORT_GND:{label:"SIG ช็อตลงกราวด์",detail:"สัญญาณค้าง 0 V ไม่ว่าคันเร่งอยู่ตำแหน่งใด",dtc:"P0122 — TPS signal low"},
+ SIG_SHORT_VREF:{label:"SIG ช็อต VREF 5 V",detail:"สัญญาณค้างใกล้ 5 V ไม่ว่าคันเร่งอยู่ตำแหน่งใด",dtc:"P0123 — TPS signal high"},
+ TRACK_WORN:{label:"รางต้านทานสึก / Dead spot",detail:"ช่วงเหยียบกลาง 35–65% สัญญาณตกผิดปกติและค่าโอห์มไม่ต่อเนื่อง",dtc:"P0120 — TPS range/performance"},
+ VREF_OPEN:{label:"ไฟอ้างอิง VREF ขาด",detail:"VREF และ SIG เป็น 0 V แม้ตัวต้านทานภายในยังวัดได้",dtc:"P0122 — 5 V reference / TPS low"},
+ IDLE_STUCK_GND:{label:"สวิตช์ IDLE ค้างต่อกราวด์",detail:"ใช้กับ TPS 4 ขั้ว: IDLE ค้าง 0 Ω แม้เริ่มเหยียบ",dtc:"P0510 — Idle switch circuit"},
+ IDLE_STUCK_OPEN:{label:"สวิตช์ IDLE ขาด / ค้างเปิด",detail:"ใช้กับ TPS 4 ขั้ว: IDLE เป็น OL แม้ปล่อยคันเร่ง",dtc:"P0510 — Idle switch circuit"}
+};
 const appConnector=p=>p?.appConnector==="9"?"9":"6";
 const appSignalPins=p=>appConnector(p)==="9"?{one:"APP1",two:"APP2"}:{one:"APS1",two:"APS2"};
 const appFault=p=>APP_FAULTS[p?.appFault] ? p.appFault : "NORMAL";
+const tpsConnector=p=>p?.tpsConnector==="4"?"4":"3";
+const tpsFault=p=>TPS_FAULTS[p?.tpsFault] ? p.tpsFault : "NORMAL";
+const tpsIdleClosed=p=>{
+ const fault=tpsFault(p);if(fault==="IDLE_STUCK_GND")return true;if(fault==="IDLE_STUCK_OPEN")return false;
+ return Number(p?.val||0)<=1;
+};
+function tpsRequirements(p){
+ const base=REQ.TPS||[];
+ return tpsConnector(p)==="4"?base.concat([["IDLE","IVS"]]):base;
+}
 function appRequirements(p){
  const base=REQ.APP||[];
  if(appConnector(p)!=="9")return base;
  return base.map(([a,b])=>[a==="APS1"?"APP1":a==="APS2"?"APP2":a,b]).concat([["IDLE","IVS"],["GND-I","GND-S"]]);
 }
-function sensorRequirements(p){return p?.type==="APP"?appRequirements(p):(REQ[p?.type]||[]);}
+function sensorRequirements(p){
+ if(p?.type==="APP")return appRequirements(p);
+ if(p?.type==="TPS")return tpsRequirements(p);
+ return REQ[p?.type]||[];
+}
 function setAppConnector(p,variant){
  const next=variant==="9"?"9":"6",prior=appConnector(p);if(next===prior)return;
  const remap=next==="9"?{APS1:"APP1",APS2:"APP2"}:{APP1:"APS1",APP2:"APS2"};
@@ -1271,9 +1314,17 @@ function setAppConnector(p,variant){
  if(next==="6")S().wires=S().wires.filter(w=>!["IDLE","GND-I","NC"].some(pin=>w.a===p.id+"."+pin||w.b===p.id+"."+pin));
  p.appConnector=next;p.limpMode=false;p.appDtc="";p.appDtcAlerted=false;
 }
+function setTpsConnector(p,variant){
+ const next=variant==="4"?"4":"3",prior=tpsConnector(p);if(next===prior)return;
+ /* A 3-pin connector has no IDLE terminal.  Remove only that now-invalid
+    wire endpoint; VREF/SIG/GND wires stay connected when changing variants. */
+ if(next==="3")S().wires=S().wires.filter(w=>w.a!==p.id+".IDLE"&&w.b!==p.id+".IDLE");
+ p.tpsConnector=next;
+}
 function pinsFor(p){
  const pins=DEF[p.type]?.pins||[];
  if(p.type==="APP")return appConnector(p)==="9"?APP_PINS_9:APP_PINS_6;
+ if(p.type==="TPS")return tpsConnector(p)==="4"?TPS_PINS_4:TPS_PINS_3;
  return p.type==="RELAY"&&relayType(p)==="SPST"?pins.filter(pin=>pin[0]!=="NC"):pins;
 }
 function componentName(p){
@@ -1380,6 +1431,7 @@ function realisticTerminal(p,index){
  if(p.type==="MAF")return{x:d.w/2+(index-2)*48,y:112};
  if(p.type==="O2")return{x:d.w/2+(index-1.5)*50,y:112};
  if(p.type==="APP"){const count=pinsFor(p).length,spacing=count===9?45:52;return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};}
+ if(p.type==="TPS"){const count=pinsFor(p).length,spacing=count===4?40:52;return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};}
  const count=pinsFor(p).length,spacing=count===1?0:Math.min(32,120/(count-1));
  return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};
 }
@@ -1469,13 +1521,14 @@ const SENSOR_TERMINAL_DETAILS={
  CMP_HALL:{"B+":"12V","GND":"Ground","SIG":"Hall Signal"},
  CMP_VR:{"S+":"Coil +","S-":"Coil −"},
  KNOCK:{"SIG":"Signal","GND":"Ground"},
+ TPS:{"VREF":"5V","SIG":"Output","GND":"Sensor GND","IDLE":"Idle SW"},
  APP:{"VREF1":"5V Main","GND1":"E1","APS1":"Signal 1","VREF2":"5V Sub","GND2":"E2","APS2":"Signal 2",
       "APP1":"Signal 1","APP2":"Signal 2","IDLE":"IVS Signal","GND-I":"IVS GND","NC":"Shield"}
 };
 function appendSensorPinLabel(parent,terminal,pinName,type){
- const detail=SENSOR_TERMINAL_DETAILS[type]?.[pinName]||"",width=type==="APP"?42:pinName.length>5?62:48;
+ const detail=SENSOR_TERMINAL_DETAILS[type]?.[pinName]||"",width=type==="APP"?42:type==="TPS"?37:pinName.length>5?62:48;
  const box=mk("foreignObject",{class:"sensor-pin-label-box",x:terminal.x-width/2,y:terminal.y+13,width,height:31});
- const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="sensor-pin-label"+(type==="APP"?" app-sensor-pin-label":"");
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="sensor-pin-label"+(type==="APP"?" app-sensor-pin-label":type==="TPS"?" tps-sensor-pin-label":"");
  const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
  const sub=document.createElement("span");sub.className="sensor-terminal-detail";sub.textContent=detail;label.appendChild(sub);
  box.appendChild(label);parent.appendChild(box);
@@ -2100,6 +2153,7 @@ stage.addEventListener("pointerdown",e=>{const P=pt(e);
     if(arm==="BATT_ANALYZER"){newPart.analyzerLocation="IN";newPart.analyzerBatteryType="FLOODED";newPart.analyzerStandard="CCA";newPart.analyzerRatedCca=600;newPart.analyzerMenuStep=0;newPart.chargingRipple=.08;newPart.simChargeVoltage=13.8;newPart.engineRunning=false;newPart.testing=false;newPart.powered=false;}
     if(arm==="DIODE")newPart.rot=0;
     if(arm==="RELAY")newPart.relayType="SPDT";
+    if(arm==="TPS"){newPart.tpsConnector="3";newPart.tpsFault="NORMAL";}
     if(arm==="APP"){newPart.appConnector="6";newPart.appFault="NORMAL";newPart.limpMode=false;}
     if(arm==="IGN")newPart.ignitionStage="LOCK";
     if(arm==="STARTER"){newPart.solenoidR=1;newPart.motorR=.10;newPart.starterFault="NORMAL";newPart.cranking=false;newPart.motorCircuitOn=false;newPart.motorSpinning=false;newPart.solenoidEngaged=false;newPart.bendixPosition=0;}
@@ -2218,7 +2272,22 @@ function sensorBranches(p){
   const P=p.id+".",f=p.fault||"NONE";
   if(!componentEnabled(p))return [];
   if(p.type==="ECT"||p.type==="IAT"){let r=ntcR(p.val);if(f==="HIGH_R")r*=3;if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.3;return [[P+"SIG",P+"GND",r]];}
-  if(p.type==="TPS"){const total=2400,v=tpsV(p.val),lo=Math.max(5,total*v/VREF),hi=Math.max(5,total-lo);return [[P+"VREF",P+"SIG",hi],[P+"SIG",P+"GND",lo]];}
+  if(p.type==="TPS"){
+   const total=2400,press=Math.max(0,Math.min(100,Number(p.val)||0)),specific=tpsFault(p);
+   const wiperV=specific==="TRACK_WORN"&&press>=35&&press<=65?VREF*.18:tpsV(press),lo=Math.max(5,total*wiperV/VREF),hi=Math.max(5,total-lo);
+   let upper=hi,lower=lo;
+   if(f==="OPEN"||f==="SHORT_BP"){upper=INF;lower=INF;}
+   if(f==="SHORT_GND")lower=.3;
+   if(f==="HIGH_R"){upper*=3;lower*=3;}
+   /* With a broken wiper the resistive track is still measurable VREF-GND,
+      but either SIG pair reads OL.  Short faults retain a true low-resistance
+      route so the DMM and the circuit solver observe the same failure. */
+   const branches=specific==="SIG_OPEN"?[[P+"VREF",P+"GND",total]]:[[P+"VREF",P+"SIG",upper],[P+"SIG",P+"GND",lower]];
+   if(specific==="SIG_SHORT_GND")branches[1]=[P+"SIG",P+"GND",.3];
+   if(specific==="SIG_SHORT_VREF")branches[0]=[P+"VREF",P+"SIG",.3];
+   if(tpsConnector(p)==="4")branches.push([P+"IDLE",P+"GND",tpsIdleClosed(p)?.05:INF]);
+   return branches;
+  }
   if(p.type==="APP"){
    let r=2400;if(f==="OPEN"||f==="SHORT_BP")r=INF;if(f==="SHORT_GND")r=.3;if(f==="HIGH_R")r=7500;
    const branches=[[P+"VREF1",P+"GND1",r],[P+"VREF2",P+"GND2",r]];
@@ -2353,7 +2422,26 @@ function applySensorSignals(V,R){
      ecuSet("VREF",vref);ecuSet("GND-S",Math.max(g1,g2));ecuSet("APP1",aps1);ecuSet("APP2",aps2);
      if(appConnector(p)==="9"){const idle=press<=1?0:vref;V[P+"IDLE"]=idle;V[P+"GND-I"]=0;V[P+"NC"]=0;R[k2(P+"IDLE",P+"GND-I")]=press<=1?.05:INF;ecuSet("IVS",idle);}
     }
-    if(p.type==="TPS"||p.type==="MAP"){let v=p.type==="TPS"?vref*(.11+.78*p.val/100):vref*(.06+.87*(p.val-20)/81),vr=vref,g=.03;if(f==="OPEN"){v=vref;vr=0;}if(f==="SHORT_GND")v=0;if(f==="SHORT_BP")v=vbatt;if(f==="HIGH_R"){g=.9;v=Math.min(vbatt,v+.9);}V[P+"VREF"]=vr;V[P+"SIG"]=v;V[P+"GND"]=g;ecuSet("VREF",vr);ecuSet(p.type==="TPS"?"SIG-B":"SIG-E",v);ecuSet("GND-S",g);}
+    if(p.type==="TPS"||p.type==="MAP"){
+     let v=p.type==="TPS"?vref*(.11+.78*p.val/100):vref*(.06+.87*(p.val-20)/81),vr=vref,g=.03;
+     if(f==="OPEN"){v=vref;vr=0;}if(f==="SHORT_GND")v=0;if(f==="SHORT_BP")v=vbatt;if(f==="HIGH_R"){g=.9;v=Math.min(vbatt,v+.9);}
+     if(p.type==="TPS"){
+      const specific=tpsFault(p),press=Math.max(0,Math.min(100,Number(p.val)||0));
+      if(specific==="SIG_OPEN")v=vref;
+      if(specific==="SIG_SHORT_GND")v=0;
+      if(specific==="SIG_SHORT_VREF")v=vref;
+      if(specific==="TRACK_WORN"&&press>=35&&press<=65)v=vref*.18;
+      if(specific==="VREF_OPEN"){vr=0;v=0;}
+      p.tpsVoltage=v;p.tpsFaultStatus=TPS_FAULTS[specific].dtc;
+     }
+     V[P+"VREF"]=vr;V[P+"SIG"]=v;V[P+"GND"]=g;
+     /* TPS VREF faults belong to this sensor branch only: do not overwrite
+        the ECU's fixed 5 V reference and accidentally disturb every sensor. */
+     ecuSet("VREF",p.type==="TPS"?vref:vr);ecuSet(p.type==="TPS"?"SIG-B":"SIG-E",v);ecuSet("GND-S",g);
+     if(p.type==="TPS"&&tpsConnector(p)==="4"){
+      const idle=tpsIdleClosed(p)?0:vref;V[P+"IDLE"]=idle;R[k2(P+"IDLE",P+"GND")]=tpsIdleClosed(p)?.05:INF;ecuSet("IVS",idle);
+     }
+    }
     if(p.type==="CKP_HALL"||p.type==="CMP_HALL"){let s=vref/2,bp=vbatt,g=.03;if(f==="OPEN"){s=0;bp=0;}if(f==="SHORT_GND")s=0;if(f==="SHORT_BP")s=vbatt;if(f==="HIGH_R"){g=1.1;s=vref*.32;}V[P+"GND"]=g;V[P+"SIG"]=s;V[P+"B+"]=bp;ecuSet(p.type==="CKP_HALL"?"SIG-C":"CMP",s);ecuSet("B+",bp);ecuSet("GND-S",g);}
     if(p.type==="CKP_VR"||p.type==="CMP_VR"){let a=vrPeak(p.val)*(p.type==="CMP_VR"?.78:1);if(f!=="NONE")a=f==="HIGH_R"?a*.35:0;V[P+"S+"]=a/Math.SQRT2;V[P+"S-"]=0;ecuSet(p.type==="CKP_VR"?"SIG-C":"CMP",a/Math.SQRT2);}
     if(p.type==="MAF"){let r=ntcR(mafIatTemp(p));if(f==="HIGH_R")r*=3;let flow=.5+4*Math.max(0,Math.min(100,+p.val||0))/100,iat=sensorDiv(r),g=.03;if(f==="OPEN"){flow=0;iat=vref;r=INF;}if(f==="SHORT_GND"){flow=0;iat=0;r=.3;}if(f==="SHORT_BP"){flow=vbatt;iat=vbatt;}V[P+"B+"]=vbatt;V[P+"GND"]=g;V[P+"VREF"]=vref;V[P+"MAF"]=flow;V[P+"IAT"]=iat;R[k2(P+"IAT",P+"GND")]=r;ecuSet("B+",vbatt);ecuSet("VREF",vref);ecuSet("GND-S",g);ecuSet("MAF",flow);ecuSet("SIG-D",iat);}
@@ -2427,6 +2515,7 @@ function livePartTooltip(p){
  if(p.type==="RES")return `ตัวต้านทาน ${formatResistance(resistorResistance(p))} ±${resistorTolerance(p)}%\n${resistorBandLabel(p)}\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)} • ${fmtW(p.actualPower||0)}\nพิกัด: ${fmtW(resistorRatedPower(p))}${p.damaged?"\nสถานะ: ไหม้ / วงจรเปิด":""}`;
  if(p.type==="LEDp"){const s=ledSpec(p);return `LED ${s.name}\nVf ${fmtV(s.vf)} • Imax ${fmtmA(s.imax)}\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)}\n${p.damaged?"สถานะ: ขาด / วงจรเปิด":p.currentLimited?"มีตัวต้านทานจำกัดกระแส":"ยังไม่พบตัวต้านทานจำกัดกระแส"}`;}
  if(p.type==="BULB"){const rv=bulbRatedVoltage(p),rw=bulbRatedPower(p);return `หลอดไฟ ${fmtV(rv)} / ${fmtW(rw)}\nR = ${bulbResistance(p).toFixed(1)} Ω\nจริง: ${fmtV(p.actualVoltage||0)} • ${fmtmA(p.actualCurrent||0)} • ${fmtW(p.actualPower||0)}\n${p.damaged?"สถานะ: ไส้ขาด / วงจรเปิด":"Tolerance แรงดัน +18%"}`;}
+ if(p.type==="TPS"){const fault=tpsFault(p),info=TPS_FAULTS[fault];return `TPS ${tpsConnector(p)} ขั้ว • คันเร่ง ${Math.round(Number(p.val)||0)}%\nSIG: ${fmtV(p.tpsVoltage??tpsV(Number(p.val)||0))}\n${fault==="NORMAL"?"✓ ":"⚠ "}${info.label}${info.dtc?`\n${info.dtc}`:""}`;}
  if(p.type==="APP"){const one=Number(p.aps1Voltage)||0,two=Number(p.aps2Voltage)||0;return `APP ${appConnector(p)} พิน • เหยียบ ${Math.round(Number(p.val)||0)}%\nSignal 1: ${fmtV(one)} • Signal 2: ${fmtV(two)}${p.appLimpMode?`\n⚠ Limp Home: ${p.appDtc||"สัญญาณไม่สัมพันธ์"}`:"\n✓ สัญญาณคู่ปกติ (2:1)"}`;}
  if(p.type==="IGN"){const stage=ignitionStage(p);return `สวิตช์กุญแจ: ${IGNITION_STAGE_LABEL[stage]}\nACC ${ignitionFeeds(p,"ACC")?"จ่ายไฟ":"ตัด"} • IGN ${ignitionFeeds(p,"IGN")?"จ่ายไฟ":"ตัด"} • ST ${ignitionFeeds(p,"ST")?"จ่ายไฟ":"ตัด"}`;}
  if(p.type==="STARTER"){const mode=starterFault(p);return `มอเตอร์สตาร์ท — ${STARTER_FAULTS[mode].label}\nS: ${fmtV(p.sVoltage||0)} • B: ${fmtV(p.motorVoltage||0)}\nกระแสมอเตอร์: ${fmtAmpsLabel(p.motorCurrent||0)} • RPM: ${Math.round(p.rpm||0)}\nBendix: ${p.solenoidEngaged?"ดันออก":"หดกลับ"}${p.overload?"\n⚠ Locked Rotor / กระแสเกิน":""}`;}
@@ -3087,7 +3176,12 @@ function dmmRead(V,R,disc){
    ซึ่งเป็นสาเหตุหนึ่งที่ตัวเลขดูรก/สับสนบนจอ LCD */
 function fmtNum(v,dec){const s=v.toFixed(dec);
   return (parseFloat(s)===0)?(0).toFixed(dec):s;}
-const referenceRowsFor=p=>p?REF.filter(row=>row[0]===p.type&&(p.type!=="APP"||!row[8]||row[8]===appConnector(p))):[];
+const referenceRowsFor=p=>p?REF.filter(row=>{
+ if(row[0]!==p.type)return false;
+ if(p.type==="APP"&&row[8]&&row[8]!==appConnector(p))return false;
+ if(p.type==="TPS"&&row[8]&&row[8]!==tpsConnector(p))return false;
+ return true;
+}):[];
 const REF_DEFAULT_PROBES={
  ECT:["SIG","GND"],IAT:["SIG","GND"],TPS:["SIG","GND"],MAP:["SIG","GND"],
  CKP_HALL:["SIG","GND"],CKP_VR:["S+","S-"],MAF:["MAF","GND"],O2:["Signal+","Signal-"],
@@ -3128,13 +3222,13 @@ function updateReferenceLive(reading){
  rows.forEach((row,index)=>{const cell=document.querySelector(`[data-ref-row="${p.id}:${index}"] .ref-live`);if(!cell)return;
   const pair=referenceProbePair(p,row),match=pair.length===2&&samePins(red,black,p.id+"."+pair[0],p.id+"."+pair[1]),kind=referenceKind(row[2]);
   cell.className="ref-live wait";
-  /* APP end-stop rows apply only at the corresponding pedal position.  This
-     avoids declaring a healthy 0% signal as bad merely because the 100%
-     reference exists in the same table (and vice versa). */
-  if(p.type==="APP"){
+  /* End-stop rows apply only at their matching pedal position.  This avoids
+     marking a healthy 0% TPS/APP reading as bad merely because a 100% row
+     appears in the same reference table. */
+  if(p.type==="APP"||p.type==="TPS"){
    const condition=String(row[1]||""),press=Number(p.val)||0,idle=press<=1,wide=press>=99;
-   const idleOnly=(condition.includes("0%")&&!condition.includes("100%"))||condition.includes("ไม่เหยียบ");
-   const wideOnly=condition.includes("100%"),pressedOnly=condition.includes("เหยียบ >1%");
+   const idleOnly=(condition.includes("0%")&&!condition.includes("100%"))||condition.includes("ไม่เหยียบ")||condition.includes("ปิดสุด")||condition.includes("ปล่อยคันเร่ง");
+   const wideOnly=condition.includes("100%")||condition.includes("เปิดสุด"),pressedOnly=condition.includes("เหยียบ >1%")||condition.includes("เริ่มเหยียบ");
    if((idleOnly&&!idle)||(wideOnly&&!wide)||(pressedOnly&&idle)){cell.textContent="—";return;}
   }
   if(!match){cell.textContent="รอวัด";return;}
@@ -3493,6 +3587,16 @@ function buildInspector(){
    <span style="color:#8b949e">(${p.id})</span></div>`;
  if(ELECTRICAL[p.type])html+=`<div style="font-size:11px;color:#5c6874;line-height:1.45;margin:-2px 0 8px">⚡ ${ELECTRICAL[p.type]}</div>`;
  html+=renderUniversalPropertyEditor(p);
+ if(p.type==="TPS"){
+  const connector=tpsConnector(p),fault=tpsFault(p),faultInfo=TPS_FAULTS[fault],idleClosed=tpsIdleClosed(p),press=Math.max(0,Math.min(100,Number(p.val)||0));
+  let signal=tpsV(press);if(fault==="SIG_OPEN"||fault==="SIG_SHORT_VREF")signal=VREF;if(fault==="SIG_SHORT_GND"||fault==="VREF_OPEN")signal=0;if(fault==="TRACK_WORN"&&press>=35&&press<=65)signal=VREF*.18;
+  const ohms=fault==="SIG_OPEN"?"OL":fault==="SIG_SHORT_GND"?"≈0 Ω":fault==="SIG_SHORT_VREF"?"≈0 Ω":`${Math.round(2400*signal/VREF)} Ω`;
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">ปลั๊กและการวัด TPS</div>
+   <div class="fld"><label>ชนิดปลั๊ก</label><select id="tpsConnector"><option value="3" ${connector==="3"?"selected":""}>TPS มาตรฐาน 3 ขั้ว</option><option value="4" ${connector==="4"?"selected":""}>TPS 4 ขั้ว + สวิตช์ IDLE</option></select></div>
+   <div class="fld"><label>อาการจำลอง TPS</label><select id="tpsFault">${Object.entries(TPS_FAULTS).map(([key,item])=>`<option value="${key}" ${fault===key?"selected":""}>${item.label}</option>`).join("")}</select></div>
+   <div style="font-size:10.5px;line-height:1.55;padding:6px 7px;border-radius:6px;background:${fault==="NORMAL"?"#e7f8ec":"#fff0ef"};color:${fault==="NORMAL"?"#087a3f":"#b42318"}">${fault==="NORMAL"?"✓ ":"⚠ "}${faultInfo.detail}${faultInfo.dtc?`<br><b>${faultInfo.dtc}</b>`:""}</div>
+   <div style="font-size:10.5px;color:#5c6874;line-height:1.55;padding:6px 7px;border-radius:6px;background:#f4f7f9;margin-top:7px">รางต้านทานรวม: <b>2,400 Ω</b><br>SIG จำลอง: <b>${fmtV(signal)}</b> • SIG-GND: <b>${ohms}</b>${connector==="4"?`<br>สวิตช์ IDLE: <b style="color:${idleClosed?"#087a3f":"#6b7784"}">${idleClosed?"ต่อ GND (≈0 Ω)":"เปิดวงจร (OL)"}</b> • ต่อ IDLE → ECU IVS`:""}</div></div>`;
+ }
  if(p.type==="APP"){
   const connector=appConnector(p),fault=appFault(p),signalPins=appSignalPins(p),limp=!!p.appLimpMode;
   html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">ปลั๊กและสัญญาณ APP คู่</div>
@@ -3624,6 +3728,8 @@ function buildInspector(){
  if(REQ[p.type])html+=`<div style="font-size:11px;color:#6b7784">อาการเสีย: <b>${FAULTS[p.fault||"NONE"]}</b></div>`;
  box.innerHTML=html;
  bindUniversalPropertyEditor(p);
+ if($("tpsConnector"))$("tpsConnector").onchange=e=>{snap();setTpsConnector(p,e.target.value);render();};
+ if($("tpsFault"))$("tpsFault").onchange=e=>{snap();p.tpsFault=TPS_FAULTS[e.target.value]?e.target.value:"NORMAL";render();};
  if($("appConnector"))$("appConnector").onchange=e=>{snap();setAppConnector(p,e.target.value);render();};
  if($("appFault"))$("appFault").onchange=e=>{snap();p.appFault=APP_FAULTS[e.target.value]?e.target.value:"NORMAL";p.appDtcAlerted=false;render();};
  if($("ignitionStage"))$("ignitionStage").onchange=e=>{snap();setIgnitionStage(p,e.target.value);playUiSound("click");render();};
