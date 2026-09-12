@@ -517,9 +517,14 @@ const batteryInternalResistance=p=>{if(isFloodedBattery(p)){
 const batteryIsEmpty=p=>floodedBatteryFault(p)==="OPEN_CIRCUIT"||!!p.batteryEmpty||batterySoc(p)<=.0001;
 function batteryTerminalVoltage(p){
  if(!componentEnabled(p)||batteryIsEmpty(p)||p.damaged)return 0;
+ /* Once the virtual engine is running, the alternator regulates the vehicle
+    bus.  Returning this here also lets ordinary voltage measurements and the
+    battery analyzer observe a real charging voltage instead of a UI-only
+    value. */
+ const charging=!!S()?.engine?.running&&!S().engine.alternatorFault;
  const ocv=batteryOpenVoltage(p),draw=Math.max(0,Number(p.outputCurrent)||0),limit=batteryMaxCurrent(p);
  const internalR=batteryInternalResistance(p);if(!Number.isFinite(internalR))return 0;
- const loaded=Math.max(0,ocv-Math.min(draw,limit)*internalR);
+ const loaded=Math.max(0,(charging?14.1:ocv)-Math.min(draw,limit)*internalR);
  return draw>limit?loaded*Math.max(.04,limit/draw):loaded;
 }
 const batteryLevelColor=soc=>soc<20?"#e05252":soc<50?"#e5a52a":"#2fbf5f";
@@ -722,7 +727,8 @@ const DEF={
         ["MAF","MAF FLOW","#61afef"],["O2","O2 SIGNAL","#61afef"],
         ["CMP","CMP SIGNAL","#61afef"],["KNOCK","KNOCK SIGNAL","#61afef"],
         ["APP1","APP1 / APS1","#61afef"],["APP2","APP2 / APS2","#98c379"],
-        ["IVS","IDLE / IVS","#f0c36b"],["GND-S","SENSOR GND","#9aa5b1"],["B+","B+ 12V","#e5c07b"]]},
+        ["IVS","IDLE / IVS","#f0c36b"],["GND-S","SENSOR GND","#9aa5b1"],["B+","B+ 12V","#e5c07b"],
+        ["CAN-H","CAN High","#f0c36b"],["CAN-L","CAN Low","#61afef"]]},
  ECT:{nm:"ECT น้ำหล่อเย็น",ic:"🌡",w:150,fill:"#2f4858",head:"#22333f",
   pins:[["SIG","ขา1 SIG","#61afef"],["GND","ขา2 GND","#9aa5b1"]]},
  IAT:{nm:"IAT อุณหภูมิอากาศ",ic:"💨",w:150,fill:"#2f4858",head:"#22333f",
@@ -756,6 +762,12 @@ const DEF={
  IGN:{nm:"สวิตช์กุญแจ",ic:"🔑",w:192,fill:"#3b4148",head:"#222a33",
   pins:[["ACC","อุปกรณ์เสริม ACC / ขั้ว 1","#98c379"],["IGN","ระบบจุดระเบิด IG / ขั้ว 15","#e5c07b"],
         ["ST","สตาร์ท ST / ขั้ว 50","#e06c75"],["BAT","ไฟแบตเตอรี่ B / ขั้ว 30","#e06c75"]]},
+ OBD2:{nm:"ปลั๊ก OBD2 DLC 16 พิน",ic:"▱",w:286,fill:"#273038",head:"#171e24",
+  pins:[["B+","Pin 16 Battery +12V","#e06c75"],["CHASSIS","Pin 4 Chassis Ground","#9aa5b1"],["SGND","Pin 5 Signal Ground","#708090"],["CAN-H","Pin 6 CAN High","#f0c36b"],["CAN-L","Pin 14 CAN Low","#61afef"]]},
+ VCI:{nm:"หัวอ่าน VCI Bluetooth",ic:"📶",w:174,fill:"#302b30",head:"#1d181d",pins:[]},
+ LAUNCH:{nm:"เครื่องสแกน Launch X431",ic:"📟",w:330,fill:"#2c2023",head:"#181215",pins:[]},
+ CLUSTER:{nm:"หน้าปัดเรือนไมล์",ic:"🚘",w:310,fill:"#252c35",head:"#171d24",
+  pins:[["IGN","IG1 / Ignition +12V","#e5c07b"],["GND","Body Ground","#9aa5b1"],["CAN-H","CAN High","#f0c36b"],["CAN-L","CAN Low","#61afef"],["CHG","L Terminal / Charge Lamp","#e06c75"]]},
  GND:{nm:"กราวด์ตัวถัง",ic:"⏚",w:126,fill:"#333b44",head:"#262d35",
   pins:[["G","CHASSIS","#9aa5b1"]]},
  /* ══ อุปกรณ์อิเล็กทรอนิกส์เพิ่มเติม (ตามชุดพาเลตที่แนบ) ══ */
@@ -793,14 +805,14 @@ const DEF={
   pins:[["A","ขา A","#c9a06a"],["B","ขา B","#9aa5b1"]]},
  FAN:{nm:"พัดลม",ic:"🌀",w:132,fill:"#333b44",head:"#262d35",
   pins:[["A","ขา A (+)","#e06c75"],["B","ขา B (−)","#9aa5b1"]]},
- RELAY:{nm:"รีเลย์",ic:"🧲",w:172,fill:"#2f4536",head:"#223228",
+ RELAY:{nm:"รีเลย์",ic:"🧲",w:220,fill:"#2f4536",head:"#223228",
   pins:[["COIL+","ขา 85 คอยล์ +","#e06c75"],["COIL-","ขา 86 คอยล์ −","#9aa5b1"],
         ["COM","ขา 30 COMMON","#f0c36b"],["NO","ขา 87 (NO)","#98c379"],
         ["NC","ขา 87a (NC)","#e06c75"]]},
  STARTER:{nm:"มอเตอร์สตาร์ท",ic:"⚙",w:244,fill:"#37414a",head:"#222a33",
   pins:[["S","สัญญาณโซลีนอยด์ / Terminal 50","#e06c75"],["B","ไฟแบตเตอรี่หลัก / Terminal 30","#e5c07b"],
         ["GND","กราวด์ตัวถัง / Body","#9aa5b1"]]},
- PSU:{nm:"แหล่งจ่ายไฟ (Power Supply)",ic:"🔌",w:170,fill:"#38414d",head:"#222a33",
+ PSU:{nm:"แหล่งจ่ายไฟ DC",ic:"🔌",w:224,fill:"#e8e9e6",head:"#b9bdc0",
   pins:[["+","เอาต์พุต +","#e06c75"],["-","เอาต์พุต −","#9aa5b1"]]},
  XFMR:{nm:"หม้อแปลงไฟฟ้า",ic:"🌐",w:160,fill:"#3d3350",head:"#2d2540",
   pins:[["P1","ปฐมภูมิ 1","#e5c07b"],["P2","ปฐมภูมิ 2","#e5c07b"],
@@ -897,6 +909,7 @@ const ELECTRICAL={
  GND:"ตัวถัง 0 V",
  BATT:"กำหนด V / Ah (หรือ mAh) / กระแสจ่ายสูงสุดได้; SOC และแรงดันตกตามโหลด", FLA_BATT:"แบตเตอรี่ตะกั่วกรด 12.6 V: CCA 300–800, Ri 3–5 mΩ, ตาแมวและระดับน้ำกลั่นจำลองได้", BATT_ANALYZER:"เครื่องวิเคราะห์แบตเตอรี่ดิจิทัล: คีบ RED/BLACK ที่ POS/NEG แล้ววิเคราะห์ SOC, SOH, CCA, การสตาร์ทและการชาร์จ",
  IGN:"สวิตช์กุญแจ 4 ตำแหน่ง: LOCK, ACC, ON และ START (สปริงกลับ ON)",
+ OBD2:"DLC 16 พิน: ต้องต่อ B+ (16), Chassis/Signal Ground (4/5) และ CAN-H/CAN-L (6/14) เข้ากับ ECU ก่อนสแกน", VCI:"หัวอ่าน VCI: ย้ายมาใกล้ DLC แล้วกดเสียบ เพื่อเชื่อม Bluetooth กับแท็บเล็ต Launch", LAUNCH:"Launch X431: เปิดเครื่อง → Intelligent Diagnose → ECM เพื่ออ่าน DTC, Live Data และ Active Test", CLUSTER:"หน้าปัด: ต่อ IG1, GND, CAN-H/CAN-L และสาย CHG เพื่อแสดงรอบและไฟเตือนตามระบบจริง",
  STARTER:"โซลีนอยด์ 0.5–2 Ω; เลือกจำลองปกติ / คลิกอย่างเดียว / หมุนฟรี / ติดขัด / ขดลวดขาดได้", PSU:"0–30 V DC, จำกัดกระแสเพื่อการเรียนรู้",
  AC:"0–1000 V RMS, 50 Hz", SW:"หน้าสัมผัส < 0.05 Ω เมื่อ ON", PB:"ปุ่มกด NO แบบ momentary, < 0.05 Ω เมื่อกด",
  MCB:"MCB 5 A, หน้าสัมผัส < 0.02 Ω เมื่อ ON", FUSE2:"ฟิวส์ 1 A, 0.05 Ω เมื่อปกติ",
@@ -1116,6 +1129,7 @@ function setNightMode(enabled,persist=true){
 let audioEnabled=false,audioContext=null,audioMaster=null,audioAssets=null;
 const buzzerVoices=new Map();
 const starterVoices=new Map();
+let engineVoice=null;
 const starterAudioStates=new Map();
 function makeAudioBuffer(ctx,duration,writer){
  const frames=Math.max(1,Math.floor(ctx.sampleRate*duration)),buffer=ctx.createBuffer(1,frames,ctx.sampleRate),data=buffer.getChannelData(0);
@@ -1150,7 +1164,8 @@ function playUiSound(name,level=1){
 function stopBuzzerVoice(id){
  const voice=buzzerVoices.get(id);if(!voice||!audioContext)return;
  const now=audioContext.currentTime;voice.gain.gain.cancelScheduledValues(now);voice.gain.gain.setTargetAtTime(0,now,.018);
- try{voice.osc.stop(now+.08);}catch(err){}buzzerVoices.delete(id);
+ try{voice.osc.stop(now+.08);}catch(err){}
+ try{voice.overtone?.stop(now+.08);}catch(err){}buzzerVoices.delete(id);
 }
 function stopAllBuzzerVoices(){[...buzzerVoices.keys()].forEach(stopBuzzerVoice);}
 function stopStarterVoice(id){
@@ -1159,6 +1174,15 @@ function stopStarterVoice(id){
  try{voice.osc.stop(now+.10);}catch(err){}starterVoices.delete(id);
 }
 function stopAllStarterVoices(){[...starterVoices.keys()].forEach(stopStarterVoice);}
+function stopEngineVoice(){
+ if(!engineVoice||!audioContext)return;const now=audioContext.currentTime;engineVoice.gain.gain.cancelScheduledValues(now);engineVoice.gain.gain.setTargetAtTime(0,now,.03);
+ try{engineVoice.low.stop(now+.10);}catch(err){}try{engineVoice.high.stop(now+.10);}catch(err){}engineVoice=null;
+}
+function syncEngineAudio(){
+ const engine=ensureEngineState();if(!audioEnabled||!audioContext||audioContext.state!=="running"||!engine.running){stopEngineVoice();return;}
+ const now=audioContext.currentTime;if(!engineVoice){const low=audioContext.createOscillator(),high=audioContext.createOscillator(),gain=audioContext.createGain();low.type="sawtooth";high.type="triangle";gain.gain.value=0;low.connect(gain);high.connect(gain);gain.connect(audioMaster);low.start();high.start();engineVoice={low,high,gain};}
+ const rpm=Math.max(650,Number(engine.rpm)||850),base=18+rpm/105;engineVoice.low.frequency.setTargetAtTime(base,now,.04);engineVoice.high.frequency.setTargetAtTime(base*2.15,now,.04);engineVoice.gain.gain.setTargetAtTime(.012+Math.min(.034,rpm/170000),now,.05);
+}
 function syncStarterAudio(){
  const starters=S().parts.filter(p=>p.type==="STARTER"),seen=new Set(starters.map(p=>p.id));
  starters.forEach(p=>{const prior=starterAudioStates.get(p.id),engaged=!!p.solenoidEngaged;
@@ -1189,9 +1213,18 @@ function syncBuzzerAudio(V){
   p.actualVoltage=voltage;p.actualCurrent=voltage/resistance;p.actualPower=voltage*p.actualCurrent;
   if(voltage<.5){stopBuzzerVoice(p.id);return;}
   active.add(p.id);let voice=buzzerVoices.get(p.id);
-  if(!voice||voice.bell!==bell){if(voice)stopBuzzerVoice(p.id);const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=bell?"sine":"square";gain.gain.value=0;osc.connect(gain).connect(audioMaster);osc.start();voice={osc,gain,bell};buzzerVoices.set(p.id,voice);}
-  voice.osc.frequency.setTargetAtTime(bell?430+ratio*250:780+ratio*720,now,.035);
-  voice.gain.gain.setTargetAtTime(bell?.018+.06*ratio:.012+.075*ratio,now,.03);
+  if(!voice||voice.bell!==bell){
+   if(voice)stopBuzzerVoice(p.id);
+   const osc=audioContext.createOscillator(),gain=audioContext.createGain();
+   osc.type=bell?"sine":"square";gain.gain.value=0;osc.connect(gain).connect(audioMaster);osc.start();
+   let overtone=null;
+   if(bell){overtone=audioContext.createOscillator();overtone.type="sine";overtone.connect(gain);overtone.start();}
+   voice={osc,gain,bell,overtone};buzzerVoices.set(p.id,voice);
+  }
+  const ringPulse=bell?.25+.75*Math.max(0,Math.sin(performance.now()*.052)):1;
+  voice.osc.frequency.setTargetAtTime(bell?465+ratio*170:780+ratio*720,now,.035);
+  if(voice.overtone)voice.overtone.frequency.setTargetAtTime(1170+ratio*210,now,.025);
+  voice.gain.gain.setTargetAtTime(bell?(.012+.052*ratio)*ringPulse:.012+.075*ratio,now,.03);
  });
  [...buzzerVoices.keys()].filter(id=>!active.has(id)).forEach(stopBuzzerVoice);
 }
@@ -1201,7 +1234,7 @@ async function setAudioEnabled(enabled){
  const ctx=enabled?ensureAudioEngine():audioContext;
  if(enabled&&ctx){try{await ctx.resume();playUiSound("alert",.45);}catch(err){audioEnabled=false;}}
  if(enabled&&!ctx)audioEnabled=false;
- if(!audioEnabled){stopAllBuzzerVoices();stopAllStarterVoices();}
+ if(!audioEnabled){stopAllBuzzerVoices();stopAllStarterVoices();stopEngineVoice();}
  updateAudioButton();
 }
 /* Browser autoplay policy: prepare buffers after the first gesture, while
@@ -1296,6 +1329,130 @@ function redo(){if(!future.length)return;hist.push(JSON.stringify(slides));
 const PIN_Y0=120,PIN_DY=26,ICON_BOX=84;
 const partH=t=>PIN_Y0+DEF[t].pins.length*PIN_DY+14;
 const findP=id=>S().parts.find(p=>p.id===id);
+/* ═══ Virtual vehicle / diagnostic bus ═══
+   These helpers keep the scanner tied to actual Canvas wiring: B+, grounds
+   and CAN must share the same wire net, not simply exist somewhere on screen. */
+const DTC_BY_DEVICE={
+ ECT:{OPEN:["P0118","ECT circuit high / open"],SHORT_GND:["P0117","ECT circuit low"],SHORT_BP:["P0118","ECT circuit high"],HIGH_R:["P0118","ECT resistance high"]},
+ IAT:{OPEN:["P0113","IAT circuit high / open"],SHORT_GND:["P0112","IAT circuit low"],SHORT_BP:["P0113","IAT circuit high"],HIGH_R:["P0113","IAT resistance high"]},
+ TPS:{OPEN:["P0122","Throttle position circuit low"],SHORT_GND:["P0122","Throttle position circuit low"],SHORT_BP:["P0123","Throttle position circuit high"],HIGH_R:["P0121","Throttle position range / performance"]},
+ MAP:{OPEN:["P0108","MAP circuit high / open"],SHORT_GND:["P0107","MAP circuit low"],SHORT_BP:["P0108","MAP circuit high"],HIGH_R:["P0106","MAP range / performance"]},
+ MAF:{OPEN:["P0103","MAF circuit high / open"],SHORT_GND:["P0102","MAF circuit low"],SHORT_BP:["P0103","MAF circuit high"],HIGH_R:["P0101","MAF range / performance"]},
+ CKP_HALL:{OPEN:["P0335","Crankshaft position sensor circuit"],SHORT_GND:["P0335","Crankshaft position sensor circuit"],SHORT_BP:["P0335","Crankshaft position sensor circuit"],HIGH_R:["P0335","Crankshaft position sensor range"]},
+ CKP_VR:{OPEN:["P0335","Crankshaft position sensor circuit"],SHORT_GND:["P0335","Crankshaft position sensor circuit"],SHORT_BP:["P0335","Crankshaft position sensor circuit"],HIGH_R:["P0335","Crankshaft position sensor range"]},
+ O2:{OPEN:["P0134","O2 sensor no activity"],SHORT_GND:["P0131","O2 sensor circuit low"],SHORT_BP:["P0132","O2 sensor circuit high"]}
+};
+function ensureEngineState(){
+ if(!S().engine)S().engine={running:false,rpm:0,systemVoltage:0,mil:false,storedDtcs:[],injectorKill:false,alternatorFault:false,lastEngineAt:0};
+ return S().engine;
+}
+function parseNode(pid){const [id,pin]=String(pid||"").split(".");return {part:findP(id),pin};}
+function terminalIsGround(pid){
+ if(pid==="CHASSIS")return true;const {part,pin}=parseNode(pid);if(!part)return false;
+ return (part.type==="GND"&&pin==="G")||((part.type==="BATT"||part.type==="FLA_BATT")&&(pin==="-"||pin==="NEG"))||(part.type==="PSU"&&pin==="-");
+}
+function terminalIsPower(pid){
+ const {part,pin}=parseNode(pid);if(!part)return false;
+ if(isBattery(part))return pin===(part.type==="FLA_BATT"?"POS":"+")&&!batteryIsEmpty(part)&&!part.damaged;
+ if(part.type==="PSU")return pin==="+"&&componentEnabled(part)&&!part.damaged;
+ if(part.type==="IGN")return pin==="IGN"&&ignitionFeeds(part,"IGN");
+ return false;
+}
+function netContains(node,matcher){return [...wireNodeSet(node)].some(matcher);}
+function ecuWiringStatus(V=S().lastVoltage||{}){
+ const ecu=S().parts.find(p=>p.type==="ECU");if(!ecu||!componentEnabled(ecu)||ecu.damaged)return {ok:false,reason:"ไม่พบ ECU ที่พร้อมทำงาน",ecu:null};
+ const power=netContains(ecu.id+".B+",terminalIsPower),ground=netContains(ecu.id+".GND-S",terminalIsGround);
+ const volts=Math.abs((V[ecu.id+".B+"]??0)-(V[ecu.id+".GND-S"]??0));
+ if(!power)return {ok:false,reason:"ECU B+ ยังไม่ต่อไฟเลี้ยง",ecu,power,ground,volts};
+ if(!ground)return {ok:false,reason:"ECU GND-S ยังไม่ต่อกราวด์",ecu,power,ground,volts};
+ if(volts<9)return {ok:false,reason:"แรงดัน ECU ต่ำกว่า 9.0 V",ecu,power,ground,volts};
+ return {ok:true,reason:"ECU พร้อมสื่อสาร",ecu,power,ground,volts};
+}
+function diagnosticDlcStatus(V=S().lastVoltage||{}){
+ const dlc=S().parts.find(p=>p.type==="OBD2"),ign=S().parts.find(p=>p.type==="IGN"),ecuState=ecuWiringStatus(V);
+ if(!dlc)return {ok:false,reason:"ไม่พบปลั๊ก OBD2 DLC",dlc:null};
+ const vci=S().parts.find(p=>p.type==="VCI"&&p.dlcId===dlc.id),power=netContains(dlc.id+".B+",terminalIsPower),ground=netContains(dlc.id+".CHASSIS",terminalIsGround)||netContains(dlc.id+".SGND",terminalIsGround);
+ const can=!!ecuState.ecu&&netContains(dlc.id+".CAN-H",id=>id===ecuState.ecu.id+".CAN-H")&&netContains(dlc.id+".CAN-L",id=>id===ecuState.ecu.id+".CAN-L");
+ const volts=Math.abs((V[dlc.id+".B+"]??0)-(V[dlc.id+".CHASSIS"]??0));
+ if(!vci)return {ok:false,reason:"ยังไม่ได้เสียบหัว VCI เข้าปลั๊ก DLC",dlc,power,ground,can,volts};
+ if(!power)return {ok:false,reason:"DLC Pin 16 ยังไม่มีไฟ B+",dlc,power,ground,can,volts,vci};
+ if(!ground)return {ok:false,reason:"DLC Pin 4/5 ยังไม่ต่อกราวด์",dlc,power,ground,can,volts,vci};
+ if(volts<9)return {ok:false,reason:"แรงดัน DLC ต่ำกว่า 9.0 V",dlc,power,ground,can,volts,vci};
+ if(!ign||!['ON','START'].includes(ignitionStage(ign)))return {ok:false,reason:"บิดสวิตช์กุญแจไปตำแหน่ง ON ก่อน",dlc,power,ground,can,volts,vci};
+ if(!ecuState.ok)return {ok:false,reason:ecuState.reason,dlc,power,ground,can,volts,vci};
+ if(!can)return {ok:false,reason:"สาย CAN-H / CAN-L ของ DLC ยังไม่ต่อกับ ECU",dlc,power,ground,can,volts,vci};
+ return {ok:true,reason:"เชื่อมต่อ ECU ผ่าน VCI Bluetooth แล้ว",dlc,power,ground,can,volts,vci,ecu:ecuState.ecu};
+}
+function clusterWiringStatus(cluster,V=S().lastVoltage||{}){
+ const ign=S().parts.find(p=>p.type==="IGN"),ecu=S().parts.find(p=>p.type==="ECU"),stage=ign?ignitionStage(ign):"LOCK";
+ const power=netContains(cluster.id+".IGN",terminalIsPower),ground=netContains(cluster.id+".GND",terminalIsGround),can=!!ecu&&netContains(cluster.id+".CAN-H",id=>id===ecu.id+".CAN-H")&&netContains(cluster.id+".CAN-L",id=>id===ecu.id+".CAN-L");
+ const volts=Math.abs((V[cluster.id+".IGN"]??0)-(V[cluster.id+".GND"]??0));
+ return {powered:componentEnabled(cluster)&&power&&ground&&volts>=9&&['ON','START'].includes(stage),power,ground,can,volts,stage};
+}
+function currentDtcEntries(){
+ const out=[];S().parts.forEach(p=>{
+  if(!REQ[p.type])return;const generic=p.fault||"NONE",specific=p.type==="TPS"?tpsFault(p):"NORMAL";
+  let item=null;
+  if(p.type==="APP"&&(appFault(p)!=="NORMAL"||p.appLimpMode))item=["P2138",p.appDtc||"Throttle/pedal position correlation"];
+  else if(p.type==="TPS"&&specific!=="NORMAL")item=[specific==="SIG_SHORT_GND"?"P0122":specific==="SIG_SHORT_VREF"||specific==="SIG_OPEN"?"P0123":"P0121",TPS_FAULTS[specific].label];
+  else if(generic!=="NONE")item=DTC_BY_DEVICE[p.type]?.[generic]||["P0600",`${componentName(p)} circuit fault`];
+  else if(!componentEnabled(p)||!wiredOK(p))item=["U1000",`${componentName(p)} communication / wiring`];
+  if(item)out.push({code:item[0],text:item[1],partId:p.id,live:true});
+ });
+ return [...new Map(out.map(x=>[x.code+":"+x.partId,x])).values()];
+}
+function diagnosticDtcs(){
+ const engine=ensureEngineState(),live=currentDtcEntries(),stored=Array.isArray(engine.storedDtcs)?engine.storedDtcs:[];
+ return [...new Map([...live,...stored].map(x=>[x.code+":"+(x.partId||""),x])).values()];
+}
+function recordDiagnosticDtcs(){const engine=ensureEngineState(),stored=Array.isArray(engine.storedDtcs)?engine.storedDtcs:[];currentDtcEntries().forEach(entry=>{if(!stored.some(old=>old.code===entry.code&&old.partId===entry.partId))stored.push({...entry,live:false});});engine.storedDtcs=stored;return diagnosticDtcs();}
+function clearDiagnosticCodes(){
+ const live=currentDtcEntries();if(live.length){showToast("⚠ ยังลบรหัสไม่ได้: ยังพบอาการเสียหรือสายขาดบน Canvas");return false;}
+ const engine=ensureEngineState();engine.storedDtcs=[];engine.mil=false;showToast("✅ Clear DTC สำเร็จ — ไฟ Check Engine ดับแล้ว");return true;
+}
+function appPedalPercent(){const p=S().parts.find(x=>x.type==="APP");return p?Math.max(0,Math.min(100,Number(p.val)||0)):0;}
+function updateVehicleEngine(V){
+ const engine=ensureEngineState(),now=performance.now(),last=Number(engine.lastEngineAt)||now,dt=Math.max(.004,Math.min(.10,(now-last)/1000));engine.lastEngineAt=now;
+ const ign=S().parts.find(p=>p.type==="IGN"),stage=ign?ignitionStage(ign):"LOCK",starter=S().parts.find(p=>p.type==="STARTER"),ecu=ecuWiringStatus(V),ckp=S().parts.find(p=>p.type==="CKP_HALL"||p.type==="CKP_VR");
+ const ckpOk=!ckp||(componentEnabled(ckp)&&!ckp.damaged&&(ckp.fault||"NONE")==="NONE"&&wiredOK(ckp));
+ const cranking=stage==="START"&&Number(starter?.rpm||0)>200,canStart=ecu.ok&&ckpOk&&!engine.injectorKill;
+ if(cranking&&canStart)engine.running=true;
+ if(!['ON','START'].includes(stage)||engine.injectorKill)engine.running=false;
+ const target=engine.running?850+appPedalPercent()*51.5:(cranking?Math.min(300,Number(starter?.rpm||0)):0),rate=engine.running?2600:4000;
+ engine.rpm=Math.max(0,Number(engine.rpm||0)+Math.sign(target-(Number(engine.rpm)||0))*Math.min(Math.abs(target-(Number(engine.rpm)||0)),rate*dt));
+ const source=S().parts.find(p=>isBattery(p)||p.type==="PSU"),base=source?(source.type==="PSU"?Number(source.val)||0:batteryTerminalVoltage(source)):0;
+ engine.systemVoltage=engine.running&&!engine.alternatorFault?14.1:Math.max(0,base);
+ const dtcs=recordDiagnosticDtcs();engine.mil=dtcs.length>0;
+ return engine;
+}
+function nearestDlcForVci(vci){let best=null,bestD=Infinity;S().parts.filter(p=>p.type==="OBD2").forEach(dlc=>{const dx=(vci.x+87)-(dlc.x+143),dy=(vci.y+55)-(dlc.y+65),d=Math.hypot(dx,dy);if(d<bestD){bestD=d;best=dlc;}});return bestD<290?best:null;}
+function toggleVciConnection(vci){const dlc=nearestDlcForVci(vci);if(!dlc){showToast("ย้ายหัว VCI ไปใกล้ปลั๊ก OBD2 DLC ก่อนเสียบ");return;}vci.dlcId=vci.dlcId===dlc.id?null:dlc.id;playUiSound("click",.7);showToast(vci.dlcId?"🔗 เสียบ VCI เข้าปลั๊ก DLC แล้ว":"ถอดหัว VCI ออกจาก DLC แล้ว");render();}
+function scannerPage(p){return p.scannerPage||"OFF";}
+function updateScannerState(){let changed=false;S().parts.filter(p=>p.type==="LAUNCH").forEach(p=>{const now=performance.now();if(scannerPage(p)==="BOOT"&&now-(p.scannerAt||now)>850){p.scannerPage="HOME";changed=true;}if(scannerPage(p)==="VIN"&&now-(p.scannerAt||now)>1350){p.scannerPage="TOPOLOGY";changed=true;}});return changed;}
+function scannerActuation(action){
+ const engine=ensureEngineState();if(action==="FAN_ON"||action==="FAN_OFF"){S().parts.filter(p=>p.type==="FAN").forEach(p=>p.scanForce=action==="FAN_ON");showToast(action==="FAN_ON"?"✅ Active Test: สั่งพัดลมทำงาน":"หยุดสั่งพัดลมแล้ว");}
+ if(action==="PUMP_ON"||action==="PUMP_OFF"){S().parts.filter(p=>p.type==="RELAY").forEach(p=>p.scanForce=action==="PUMP_ON");showToast(action==="PUMP_ON"?"✅ Active Test: สั่งรีเลย์ทำงาน":"หยุดสั่งรีเลย์แล้ว");}
+ if(action==="INJECTOR_KILL"){engine.injectorKill=!engine.injectorKill;showToast(engine.injectorKill?"⛔ Injector Kill — เครื่องยนต์ดับ":"✅ Injector Kill ปลดแล้ว");}
+}
+function scannerAction(p,action){
+ if(action==="POWER"){p.scannerPage=scannerPage(p)==="OFF"?"BOOT":"OFF";p.scannerAt=performance.now();playUiSound("alert",.6);render();return;}
+ if(action==="SCALE+"){p.scannerScale=Math.min(1.35,(Number(p.scannerScale)||1)+.10);render();return;}
+ if(action==="SCALE-"){p.scannerScale=Math.max(.70,(Number(p.scannerScale)||1)-.10);render();return;}
+ if(scannerPage(p)==="OFF"||scannerPage(p)==="BOOT")return;
+ const connection=diagnosticDlcStatus();
+ if((["INTELLIGENT","LOCAL","OBD","ECM","DTC","DATA","ACTIVE"].includes(action)||action.startsWith("TEST_"))&&!connection.ok){p.scannerPage="ERROR";p.scannerError=connection.reason;render();return;}
+ if(action==="INTELLIGENT"){p.scannerPage="VIN";p.scannerAt=performance.now();}
+ else if(action==="LOCAL"||action==="OBD"){p.scannerPage="TOPOLOGY";}
+ else if(action==="SETTINGS"){p.scannerPage="SETTINGS";}
+ else if(action==="ECM"){p.scannerPage="ECM";}
+ else if(action==="DTC"){p.scannerPage="DTC";}
+ else if(action==="DATA"){p.scannerPage="DATA";}
+ else if(action==="ACTIVE"){p.scannerPage="ACTIVE";}
+ else if(action==="CLEAR"){clearDiagnosticCodes();p.scannerPage="DTC";}
+ else if(action==="BACK"){p.scannerPage="HOME";}
+ else if(action.startsWith("TEST_")){scannerActuation(action.slice(5));}
+ render();
+}
 /* 64 SVG units = four 16-unit perfboard grid intervals. */
 const DIODE_LEAD_END=64;
 const diodeRotation=p=>((Number(p.rot)||0)%360+360)%360;
@@ -1304,6 +1461,23 @@ function diodePoint(p,x,y=0){const rad=diodeRotation(p)*Math.PI/180,cos=Math.cos
    The terminal source of truth is shared by drawing, hit testing and netlist
    creation, so changing type cannot leave an invisible/wireable NC pin. */
 function relayType(p){return p?.relayType==="SPST"?"SPST":"SPDT";}
+/* Pin locations follow the physical relay base.  Keeping them in one map
+   means the image, snapping, wires and netlist always agree for 4/5-pin
+   variants instead of leaving an invisible NC terminal behind. */
+function relayPinLocal(p,pin){
+ const points=relayType(p)==="SPDT"?
+  {"COIL+":{x:22,y:136},"COIL-":{x:66,y:136},COM:{x:110,y:136},NO:{x:154,y:136},NC:{x:198,y:136}}:
+  {"COIL+":{x:32,y:136},"COIL-":{x:80,y:136},COM:{x:140,y:136},NO:{x:188,y:136}};
+ return points[pin]||null;
+}
+function obdPinLocal(pin){
+ const points={"B+":{x:244,y:125},CHASSIS:{x:38,y:125},SGND:{x:82,y:125},"CAN-H":{x:126,y:125},"CAN-L":{x:170,y:125}};
+ return points[pin]||null;
+}
+function clusterPinLocal(pin){
+ const points={IGN:{x:35,y:139},GND:{x:95,y:139},"CAN-H":{x:155,y:139},"CAN-L":{x:215,y:139},CHG:{x:275,y:139}};
+ return points[pin]||null;
+}
 const APP_FAULTS={
  NORMAL:"ปกติ — สัญญาณสัมพันธ์ 2:1",
  APS1_OPEN:"APS / APP1 ขาด — 0 V",
@@ -1469,6 +1643,10 @@ function realisticTerminal(p,index){
  }
  if(p.type==="IGN")return{x:d.w/2+(index-1.5)*40,y:112};
  if(p.type==="STARTER")return{x:d.w/2+(index-1)*47,y:112};
+ if(p.type==="RELAY")return relayPinLocal(p,pinsFor(p)[index]?.[0])||{x:d.w/2,y:136};
+ if(p.type==="OBD2")return obdPinLocal(pinsFor(p)[index]?.[0])||{x:d.w/2,y:125};
+ if(p.type==="CLUSTER")return clusterPinLocal(pinsFor(p)[index]?.[0])||{x:d.w/2,y:139};
+ if(p.type==="PSU")return{x:index===0?82:142,y:122};
  if(p.type==="FLA_BATT")return{x:d.w/2+(index-.5)*58,y:112};
  if(p.type==="BATT_ANALYZER")return{x:d.w/2+(index-.5)*68,y:142};
  if(p.type==="MAF")return{x:d.w/2+(index-2)*48,y:112};
@@ -1478,13 +1656,11 @@ function realisticTerminal(p,index){
  const count=pinsFor(p).length,spacing=count===1?0:Math.min(32,120/(count-1));
  return{x:d.w/2+(index-(count-1)/2)*spacing,y:112};
 }
-/* The starter has three external cable terminals plus three clearly marked
-   cutaway test pads.  Test pads accept probes but are intentionally kept off
-   the ordinary connector row so learners cannot mistake them for harness pins. */
-const STARTER_TEST_PINS=new Set(["C","BR+","BR-"]);
+/* The cutaway remains visible, but wiring is intentionally restricted to the
+   three external vehicle terminals.  Internal C/brush details are artwork,
+   not extra connection points. */
 function starterPinLocal(pin){
- const points={S:{x:48,y:126},B:{x:122,y:126},GND:{x:198,y:126},
-   C:{x:181,y:28},"BR+":{x:76,y:76},"BR-":{x:61,y:76}};
+ const points={S:{x:48,y:126},B:{x:122,y:126},GND:{x:198,y:126}};
  return points[pin]||null;
 }
 function starterPinPos(p,pin){const point=starterPinLocal(pin);return point?{x:p.x+point.x,y:p.y+point.y}:null;}
@@ -1526,8 +1702,7 @@ function pinPos(pid){
    rotated, or when terminals are visually covered by a wire end. */
 function nearestConnectablePin(point){
  const ids=[];
- S().parts.forEach(p=>{pinsFor(p).forEach(pin=>ids.push(p.id+"."+pin[0]));
-   if(p.type==="STARTER")STARTER_TEST_PINS.forEach(pin=>ids.push(p.id+"."+pin));});
+ S().parts.forEach(p=>pinsFor(p).forEach(pin=>ids.push(p.id+"."+pin[0])));
  dmmInstances().forEach(m=>ids.push(`${m.id}.RED`,`${m.id}.BLACK`));
  scopeInstances().forEach(s=>["CH1","CH2","CH3"].forEach(channel=>{ids.push(`${s.id}.${channel}.RED`,`${s.id}.${channel}.BLACK`);}));
  const radius=16/Math.max(.25,zoomScale);let best=null,bestDistance=radius*radius;
@@ -1561,6 +1736,20 @@ function appendRelayPinLabel(parent,terminal,pinName){
  const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
  const number=document.createElement("span");number.className="terminal-number";number.textContent=RELAY_PIN_NUMBER[pinName]||"";label.appendChild(number);
  box.appendChild(label);parent.appendChild(box);
+}
+const OBD_PIN_LABELS={"B+":"16 / B+",CHASSIS:"4 / GND",SGND:"5 / SGND","CAN-H":"6 / CAN-H","CAN-L":"14 / CAN-L"};
+function appendObdPinLabel(parent,terminal,pinName){
+ const box=mk("foreignObject",{class:"relay-pin-label-box",x:terminal.x-24,y:terminal.y+13,width:48,height:31});
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="relay-pin-label";
+ const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const sub=document.createElement("span");sub.className="terminal-number";sub.textContent=OBD_PIN_LABELS[pinName]||"";label.appendChild(sub);box.appendChild(label);parent.appendChild(box);
+}
+const CLUSTER_PIN_LABELS={IGN:"IG1 / 15",GND:"BODY", "CAN-H":"CAN-H", "CAN-L":"CAN-L",CHG:"L"};
+function appendClusterPinLabel(parent,terminal,pinName){
+ const box=mk("foreignObject",{class:"relay-pin-label-box",x:terminal.x-25,y:terminal.y+13,width:50,height:31});
+ const label=document.createElement("div");label.setAttribute("xmlns","http://www.w3.org/1999/xhtml");label.className="relay-pin-label";
+ const main=document.createElement("span");main.textContent=pinName;label.appendChild(main);
+ const sub=document.createElement("span");sub.className="terminal-number";sub.textContent=CLUSTER_PIN_LABELS[pinName]||"";label.appendChild(sub);box.appendChild(label);parent.appendChild(box);
 }
 const STANDARD_TERMINAL_LABELS={
  IGN:{ACC:"ACC / 1",IGN:"IG / 15",ST:"ST / 50",BAT:"B / 30"},
@@ -1600,6 +1789,20 @@ const instrScope=mk("g",{id:"instrScope"});instrL.appendChild(instrScope);
 const curveD=(a,b)=>`M ${a.x} ${a.y} C ${a.x+70} ${a.y}, ${b.x-70} ${b.y}, ${b.x} ${b.y}`;
 /* ═══ ไอคอนอุปกรณ์แบบ "เหมือนของจริง" (แทนอิโมจิ) วางแทนที่มุมซ้ายบนหัวกล่อง
    วาดด้วย SVG ล้วน ไม่กระทบตำแหน่งขา/พิน เพราะวาดในกรอบเล็ก 24×24 ตายตัว ═══ */
+function starterPaletteIcon(){
+ const g=mk("g",{});
+ /* compact exterior view: alloy drive housing + black motor can + solenoid */
+ g.appendChild(mk("path",{d:"M2 13 L8 9 Q13 8 17 13 L18 22 Q12 27 5 24 L1 20 Z",fill:"#bec7c7",stroke:"#556367","stroke-width":1.1}));
+ g.appendChild(mk("circle",{cx:6,cy:18,r:4,fill:"#2d393d",stroke:"#121a1d","stroke-width":1}));
+ for(let a=0;a<360;a+=60){const r=a*Math.PI/180;g.appendChild(mk("line",{x1:6+Math.cos(r)*2.6,y1:18+Math.sin(r)*2.6,x2:6+Math.cos(r)*4.2,y2:18+Math.sin(r)*4.2,stroke:"#aeb8b8","stroke-width":.7}));}
+ g.appendChild(mk("rect",{x:14,y:13,width:17,height:10,rx:5,fill:"#293338",stroke:"#11191d","stroke-width":1.2}));
+ g.appendChild(mk("path",{d:"M16 15 H29",stroke:"#647176","stroke-width":1.1,"stroke-linecap":"round",opacity:.8}));
+ g.appendChild(mk("ellipse",{cx:30,y:18,rx:2.8,ry:5,fill:"#aeb8b8",stroke:"#4f5b5e","stroke-width":.8}));
+ g.appendChild(mk("rect",{x:14,y:5,width:13,height:5,rx:2.5,fill:"#c8ad5d",stroke:"#68562a","stroke-width":1}));
+ g.appendChild(mk("rect",{x:12,y:6,width:3,height:3,rx:1,fill:"#9ba6a7",stroke:"#4a5558","stroke-width":.6}));
+ g.appendChild(mk("circle",{cx:27,y:8,r:1.7,fill:"#b48c35",stroke:"#5d4720","stroke-width":.7}));
+ return g;
+}
 function partIcon(p){
   const t=p.type,G=mk("g",{transform:"translate(1,1) scale(0.82)"});
   const on=!!p.on,broken=!!p.damaged,lit=!!p.lit&&!broken,en=!!p.energized;
@@ -1733,14 +1936,17 @@ function partIcon(p){
       fill:"#d9b45c",stroke:"#8a6d23","stroke-width":1}));
     G.appendChild(mk("rect",{x:13,y:2,width:4,height:3,rx:1,fill:"#8a6d23"}));
     G.appendChild(mk("rect",{x:5,y:22,width:20,height:3,rx:1.4,fill:"#c49a3f",stroke:"#8a6d23","stroke-width":.6}));
-    G.appendChild(mk("circle",{cx:15,cy:27,r:1.8,fill:"#6b5320"}));
+    const hammer=mk("g",{class:"bell-hammer","data-part-id":p.id,transform:"rotate(0 15 21)"});
+    hammer.appendChild(mk("line",{x1:15,y1:20,x2:15,y2:26,stroke:"#6b5320","stroke-width":1.15,"stroke-linecap":"round"}));
+    hammer.appendChild(mk("circle",{cx:15,cy:27,r:1.8,fill:"#6b5320"}));G.appendChild(hammer);
     if(lit){G.appendChild(mk("path",{d:"M27 10 q4 7 0 14",fill:"none",stroke:"#ffd166","stroke-width":1.6}));
       G.appendChild(mk("path",{d:"M24 12 q2.5 5 0 10",fill:"none",stroke:"#ffd166","stroke-width":1.6}));}
   } else if(t==="FAN"){
-    G.appendChild(mk("circle",{cx:15,cy:15,r:3,fill:"#5c6874"}));
-    [0,90,180,270].forEach(a=>{const rad=(a+(lit?20:0))*Math.PI/180;
-      G.appendChild(mk("ellipse",{cx:15+Math.cos(rad)*7,cy:15+Math.sin(rad)*7,rx:6,ry:3,
+    const rotor=mk("g",{class:"fan-rotor","data-part-id":p.id,transform:`rotate(${Number(p.fanAngle)||0} 15 15)`});
+    [0,90,180,270].forEach(a=>{const rad=a*Math.PI/180;
+      rotor.appendChild(mk("ellipse",{cx:15+Math.cos(rad)*7,cy:15+Math.sin(rad)*7,rx:6,ry:3,
         fill:"#8aa5c7",transform:`rotate(${a} ${15+Math.cos(rad)*7} ${15+Math.sin(rad)*7})`}));});
+    G.appendChild(rotor);G.appendChild(mk("circle",{cx:15,cy:15,r:3,fill:"#5c6874"}));
   } else if(t==="IGN"){
     const stage=ignitionStage(p),angle={LOCK:-135,ACC:-45,ON:10,START:58}[stage]??-135;
     G.appendChild(mk("circle",{cx:15,cy:15,r:13,fill:"#303841",stroke:"#151b21","stroke-width":1.5}));
@@ -1766,11 +1972,15 @@ function partIcon(p){
     G.appendChild(bendix);
     G.appendChild(mk("text",{class:"starter-mode-mark","data-part-id":p.id,x:16,y:29,"text-anchor":"middle","font-size":4.3,"font-weight":700,fill:faultColor},mode==="NORMAL"?"START":mode==="CLICK_ONLY"?"CLICK":mode==="FREE_SPIN"?"FREE":mode==="JAMMED"?"JAM":"OPEN"));
   } else if(t==="RELAY"){
-    G.appendChild(mk("rect",{x:3,y:4,width:24,height:22,rx:3,fill:"#3a4550",stroke:"#1b2129"}));
-    for(let i=0;i<4;i++)G.appendChild(mk("path",{d:`M ${7} ${8+i*3.5} h 8`,fill:"none",
-      stroke:"#c9820a","stroke-width":1.4}));
-    G.appendChild(mk("line",{x1:19,y1:9,x2:24,y2:9+(en?6:0),stroke:en?"#7ee787":"#aaa","stroke-width":2}));
-    G.appendChild(mk("circle",{cx:24,cy:22,r:1.6,fill:en?"#7ee787":"#666"}));
+    /* Miniature of the open-frame copper-coil relay used on the Canvas. */
+    G.appendChild(mk("path",{d:"M3 5 H27 V25 H3 Z",fill:"#273236",stroke:"#11191b","stroke-width":1}));
+    G.appendChild(mk("rect",{x:6,y:8,width:8,height:14,rx:1.5,fill:"#20282b",stroke:"#11191b","stroke-width":.7}));
+    for(let y=9;y<21;y+=2)G.appendChild(mk("line",{x1:7,y1:y,x2:13,y2:y,stroke:en?"#ff8a58":"#b85e33","stroke-width":1.35}));
+    G.appendChild(mk("line",{x1:16,y1:9,x2:16,y2:22,stroke:"#9ba7a7","stroke-width":2.1}));
+    G.appendChild(mk("circle",{cx:18,cy:16,r:1.6,fill:"#718083"}));
+    G.appendChild(mk("line",{x1:18,y1:16,x2:25,y2:en?10:21,stroke:"#c7cecc","stroke-width":2.2,"stroke-linecap":"round"}));
+    G.appendChild(mk("circle",{cx:25,cy:10,r:1.5,fill:en?"#ffe083":"#a8792d"}));
+    if(relayType(p)==="SPDT")G.appendChild(mk("circle",{cx:25,cy:22,r:1.5,fill:!en?"#ffe083":"#a8792d"}));
   } else if(t==="SW"){
     G.appendChild(mk("circle",{cx:6,cy:20,r:2.2,fill:"#98c379"}));
     G.appendChild(mk("circle",{cx:24,cy:20,r:2.2,fill:"#98c379"}));
@@ -1837,9 +2047,12 @@ function partIcon(p){
     G.appendChild(mk("text",{x:6,y:27.3,"text-anchor":"middle","font-size":3.2,"font-weight":700,fill:"#ff7670"},"+") );
     G.appendChild(mk("text",{x:24,y:27.3,"text-anchor":"middle","font-size":3.2,"font-weight":700,fill:"#c8d0d7"},"−") );
   } else if(t==="PSU"){
-    G.appendChild(mk("rect",{x:3,y:8,width:20,height:14,rx:2,fill:"#3a3a3a"}));
-    G.appendChild(mk("rect",{x:23,y:12,width:3,height:6,fill:"#3a3a3a"}));
-    G.appendChild(mk("text",{x:13,y:18,"text-anchor":"middle","font-size":9,fill:"#e5c07b","font-weight":700},"+ −"));
+    G.appendChild(mk("path",{d:"M3 8 h20 l4 4 v12 H3 z",fill:"#dde0dd",stroke:"#777d80","stroke-width":.8}));
+    G.appendChild(mk("rect",{x:5,y:10,width:18,height:7,rx:1,fill:"#202426"}));
+    G.appendChild(mk("text",{x:8,y:14.5,"font-size":3.2,fill:"#ff5d59","font-family":"monospace","font-weight":700},"0.0"));
+    G.appendChild(mk("text",{x:16,y:14.5,"font-size":3.2,fill:"#b8ef42","font-family":"monospace","font-weight":700},"12.0"));
+    [9,15,21].forEach(x=>G.appendChild(mk("circle",{cx:x,cy:22,r:2,fill:"#f1f3f1",stroke:"#8d9497","stroke-width":.65})));
+    G.appendChild(mk("circle",{cx:7,cy:27,r:1.8,fill:"#202326"}));G.appendChild(mk("circle",{cx:21,cy:27,r:1.8,fill:"#d5534a"}));
   } else if(t==="GND"){
     /* สัญลักษณ์กราวด์มาตรฐาน (เส้นลดหลั่นสามชั้น) เหมือนของจริงในวงจร */
     G.appendChild(mk("line",{x1:14,y1:2,x2:14,y2:15,stroke:"#c9a06a","stroke-width":2}));
@@ -2047,76 +2260,232 @@ function realisticStarter(p){
  const g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-starter",opacity:componentEnabled(p)?1:.42});
  g.dataset.pid=p.id;
  g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#263545"},componentName(p)));
- if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:63,rx:120,ry:62,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:66,rx:120,ry:65,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
 
- /* Drive-end frame, body shell and stationary field coils. */
- g.appendChild(mk("path",{d:"M 178 47 L 209 38 Q 226 41 231 57 L 231 80 Q 224 95 207 98 L 178 89 Z",fill:"#aab3b8",stroke:"#4b5960","stroke-width":2}));
- g.appendChild(mk("path",{d:"M 205 45 Q 225 50 225 68 Q 225 86 205 91",fill:"none",stroke:"#e3e7e8","stroke-width":3,opacity:.8}));
- g.appendChild(mk("rect",{x:48,y:42,width:141,height:52,rx:25,fill:"#3f4a50",stroke:"#202a30","stroke-width":2.4}));
- g.appendChild(mk("path",{d:"M 66 49 H 171 Q 181 52 184 62 H 57 Q 59 53 66 49",fill:"#66767c",opacity:.75}));
- g.appendChild(mk("rect",{x:61,y:52,width:106,height:32,rx:15,fill:"#263137",stroke:"#79878b","stroke-width":1.2}));
- [[74,54],[143,54],[74,76],[143,76]].forEach(([x,y])=>g.appendChild(mk("path",{d:`M ${x} ${y} q 10 12 0 24`,fill:"none",stroke:"#b66a2a","stroke-width":4,"stroke-linecap":"round"})));
- g.appendChild(mk("text",{x:128,y:87,"text-anchor":"middle","font-size":6.7,"font-weight":700,fill:"#e0a363"},"FIELD COIL"));
+ /* Skeuomorphic automotive-starter finishes: cast alloy nose, black motor
+    can and plated solenoid.  These gradients keep the device legible against
+    every workspace background while matching the supplied real-world form. */
+ const defs=mk("defs",{}),id=String(p.id).replace(/[^a-zA-Z0-9_-]/g,"_");
+ const gradient=(name,stops)=>{const grad=mk("linearGradient",{id:`starter-${name}-${id}`,x1:"0%",y1:"0%",x2:"0%",y2:"100%"});stops.forEach(([offset,color])=>grad.appendChild(mk("stop",{offset,"stop-color":color})));defs.appendChild(grad);return `url(#starter-${name}-${id})`;};
+ const alloy=gradient("alloy",[["0%","#f4f6f4"],["22%","#9fa8a9"],["48%","#e0e4e3"],["77%","#818b8c"],["100%","#cbd1d0"]]);
+ const black=gradient("motor",[["0%","#697277"],["12%","#1b2226"],["48%","#30383c"],["72%","#0e1417"],["100%","#596367"]]);
+ const gold=gradient("solenoid",[["0%","#ebd98d"],["25%","#9b7c35"],["48%","#e7d27e"],["78%","#80622a"],["100%","#c2a656"]]);
+ const copper=gradient("copper",[["0%","#f1b15c"],["48%","#9b4f1d"],["100%","#e09442"]]);g.appendChild(defs);
+ const external=["S","B","GND"],terminalAnchor={S:{x:85,y:34},B:{x:182,y:34},GND:{x:216,y:90}};
+ /* The short internal harnesses are painted first so the cast body conceals
+    them.  Previously they were painted last and the red S lead visibly cut
+    diagonally across the aluminium gearbox. */
+ external.forEach(pin=>{const t=starterPinLocal(pin),a=terminalAnchor[pin];
+   g.appendChild(mk("line",{x1:a.x,y1:a.y,x2:t.x,y2:t.y-7,stroke:pin==="B"?"#d6a447":pin==="S"?"#d95a5d":"#a4afb5","stroke-width":2.7,"stroke-linecap":"round"}));
+ });
 
- /* Armature, commutator and brushes within the open housing. */
- const armature=mk("g",{class:"starter-armature","data-part-id":p.id,transform:`rotate(${Number(p.rotorAngle)||0} 112 68)`});
- armature.appendChild(mk("line",{x1:71,y1:68,x2:202,y2:68,stroke:"#c4cdd1","stroke-width":5,"stroke-linecap":"round"}));
- armature.appendChild(mk("circle",{cx:112,cy:68,r:15,fill:"#a96930",stroke:"#3e2b1d","stroke-width":2}));
- armature.appendChild(mk("circle",{cx:112,cy:68,r:7,fill:"#2d373d",stroke:"#bac7cd","stroke-width":1.2}));
- for(let a=0;a<360;a+=45){const r=a*Math.PI/180;armature.appendChild(mk("rect",{x:105,y:49,width:14,height:10,rx:2,fill:"#c47a31",stroke:"#55351e","stroke-width":.7,transform:`rotate(${a} 112 68)`}));}
- g.appendChild(armature);
- const commutator=mk("g",{class:"starter-commutator","data-part-id":p.id,transform:`rotate(${Number(p.rotorAngle)||0} 72 68)`});
- commutator.appendChild(mk("circle",{cx:72,cy:68,r:10,fill:"#cb7631",stroke:"#5b361e","stroke-width":1.3}));
- for(let a=0;a<360;a+=45)commutator.appendChild(mk("line",{x1:72,y1:59,x2:72,y2:77,stroke:"#54301b","stroke-width":1,transform:`rotate(${a} 72 68)`}));
- g.appendChild(commutator);
- [[62,56],[62,79]].forEach(([x,y])=>{g.appendChild(mk("rect",{x:x-6,y:y-4,width:12,height:8,rx:2,fill:"#1e2529",stroke:"#aeb8bd","stroke-width":1}));g.appendChild(mk("line",{x1:x+5,y1:y,x2:68,y2:68,stroke:"#e3b25f","stroke-width":1.5}));});
- const sparks=mk("g",{class:"starter-brush-sparks","data-part-id":p.id,opacity:spinning ? 0.9 : 0});
- [[64,56],[64,79]].forEach(([x,y])=>{sparks.appendChild(mk("path",{d:`M ${x} ${y} l -7 -4 m 4 8 l -6 3 m 7 -1 l -2 7`,fill:"none",stroke:"#ff9f1c","stroke-width":1.3,"stroke-linecap":"round"}));});g.appendChild(sparks);
+ /* Motor can, rear cap and fastening bolts — equivalent to the black cylinder
+    on a production starter motor. */
+ g.appendChild(mk("path",{d:"M 86 43 H 207 Q 222 45 225 61 V 81 Q 220 96 204 98 H 86 Z",fill:black,stroke:"#151c20","stroke-width":2.5}));
+ g.appendChild(mk("path",{d:"M 95 49 H 202",fill:"none",stroke:"rgba(255,255,255,.30)","stroke-width":2.2,"stroke-linecap":"round"}));
+ g.appendChild(mk("path",{d:"M 94 92 H 202",fill:"none",stroke:"rgba(0,0,0,.5)","stroke-width":2,"stroke-linecap":"round"}));
+ g.appendChild(mk("ellipse",{cx:211,cy:70,rx:13,ry:27,fill:alloy,stroke:"#566062","stroke-width":2}));
+ [[113,49],[185,49],[113,91],[185,91]].forEach(([x,y])=>{g.appendChild(mk("circle",{cx:x,cy:y,r:2.5,fill:"#d1d6d5",stroke:"#424e51","stroke-width":1}));g.appendChild(mk("line",{x1:x-1.2,y1:y,x2:x+1.2,y2:y,stroke:"#596164","stroke-width":.8}));});
 
- /* Solenoid body, moving plunger and copper contact bridge (Terminal 30→C). */
- g.appendChild(mk("rect",{x:86,y:8,width:104,height:29,rx:14,fill:"#bea562",stroke:"#5f5027","stroke-width":2}));
- g.appendChild(mk("path",{d:"M 97 12 H 177",stroke:"rgba(255,255,255,.48)","stroke-width":2,"stroke-linecap":"round"}));
- g.appendChild(mk("rect",{x:87,y:12,width:12,height:21,rx:4,fill:"#4a5150",stroke:"#202729","stroke-width":1.1}));
- g.appendChild(mk("rect",{x:178,y:12,width:12,height:21,rx:4,fill:"#4a5150",stroke:"#202729","stroke-width":1.1}));
- const movingPlunger=mk("g",{class:"starter-plunger","data-part-id":p.id,transform:`translate(${-plunger*15} 0)`});
- movingPlunger.appendChild(mk("rect",{x:112,y:17,width:51,height:11,rx:5,fill:"#cbd1d2",stroke:"#555f63","stroke-width":1.2}));
- movingPlunger.appendChild(mk("line",{x1:107,y1:22.5,x2:78,y2:36,stroke:"#8a9397","stroke-width":3,"stroke-linecap":"round"}));
- g.appendChild(movingPlunger);
- const bridge=mk("g",{class:"starter-contact-bridge","data-part-id":p.id,transform:`translate(${-plunger*15} 0)`});
- bridge.appendChild(mk("rect",{x:158,y:16,width:16,height:13,rx:2,fill:p.contactClosed?"#e19b42":"#8d6435",stroke:"#4b3219","stroke-width":1}));
- bridge.appendChild(mk("line",{x1:166,y1:29,x2:166,y2:43,stroke:"#d89d4b","stroke-width":3}));
- g.appendChild(bridge);
+ /* Cast-aluminium gear reduction / drive-end housing and mounting flange. */
+ g.appendChild(mk("path",{d:"M 19 40 L 58 32 Q 78 31 97 45 L 106 59 V 82 L 91 97 Q 70 108 42 102 L 18 91 Q 9 81 10 65 Q 10 49 19 40 Z",fill:alloy,stroke:"#5b6668","stroke-width":2.4}));
+ g.appendChild(mk("path",{d:"M 25 43 Q 47 37 68 44 Q 82 50 88 66 Q 83 85 66 94 Q 42 98 25 87",fill:"none",stroke:"rgba(255,255,255,.62)","stroke-width":2.1}));
+ g.appendChild(mk("path",{d:"M 13 51 L 2 43 L 4 33 L 26 39 M 16 86 L 3 96 L 8 108 L 30 97",fill:alloy,stroke:"#566164","stroke-width":2,"stroke-linejoin":"round"}));
+ [[9,41],[10,100],[72,101]].forEach(([x,y])=>g.appendChild(mk("circle",{cx:x,cy:y,r:4,fill:"#30383c",stroke:"#c2c9c8","stroke-width":1.3})));
+ /* Service opening exposes the moving Bendix, like the reference nose. */
+ g.appendChild(mk("ellipse",{cx:31,cy:69,rx:20,ry:22,fill:"#242d30",stroke:"#687477","stroke-width":2}));
+ g.appendChild(mk("ellipse",{cx:31,cy:69,rx:13,ry:15,fill:"#101719",stroke:"#8e999a","stroke-width":1.1}));
 
- /* Shift lever and Bendix/pinion: the pinion travels toward the drive frame. */
- g.appendChild(mk("circle",{cx:177,cy:51,r:5,fill:"#758087",stroke:"#303b42","stroke-width":1.5}));
- const lever=mk("g",{class:"starter-shift-lever","data-part-id":p.id,transform:`rotate(${-engagement*23} 177 51)`});
- lever.appendChild(mk("path",{d:"M 177 51 L 197 62 L 188 72 L 170 59",fill:"#76828a",stroke:"#303b42","stroke-width":2,"stroke-linejoin":"round"}));
- g.appendChild(lever);
- const bendix=mk("g",{class:"starter-bendix-large","data-part-id":p.id,transform:`translate(${engagement*18} 0)`});
- bendix.appendChild(mk("rect",{x:190,y:61,width:30,height:13,rx:5,fill:"#88949a",stroke:"#344048","stroke-width":1.4}));
- bendix.appendChild(mk("circle",{cx:218,cy:68,r:12,fill:"#4c5a61",stroke:"#1c272c","stroke-width":1.8}));
- for(let a=0;a<360;a+=36){const r=a*Math.PI/180;bendix.appendChild(mk("line",{x1:218+Math.cos(r)*9,y1:68+Math.sin(r)*9,x2:218+Math.cos(r)*14,y2:68+Math.sin(r)*14,stroke:"#1a262c","stroke-width":2,"stroke-linecap":"round"}));}
- bendix.appendChild(mk("circle",{cx:218,cy:68,r:4,fill:"#c2cbce",stroke:"#27343a","stroke-width":1}));g.appendChild(bendix);
+ /* The motor can is now kept closed, matching a production starter rather
+    than showing orange diagnostic parts through the side of the housing. */
+ [[130,55],[145,55],[160,55],[175,55],[130,83],[145,83],[160,83],[175,83]].forEach(([x,y])=>
+   g.appendChild(mk("line",{x1:x,y1:y,x2:x+7,y2:y,stroke:"#0c1215","stroke-width":1.5,"stroke-linecap":"round",opacity:.76})));
 
- /* S, B and GND are the harness terminals.  C/brush pads are test-only. */
- const external=["S","B","GND"];
- external.forEach(pin=>{const t=starterPinLocal(pin),anchor={S:{x:102,y:34},B:{x:184,y:34},GND:{x:165,y:90}}[pin],meta=DEF.STARTER.pins.find(item=>item[0]===pin);
-   g.appendChild(mk("line",{x1:anchor.x,y1:anchor.y,x2:t.x,y2:t.y-7,stroke:pin==="B"?"#d6a447":pin==="S"?"#d95a5d":"#a4afb5","stroke-width":3,"stroke-linecap":"round"}));
+ /* Solenoid, its plunger, and the copper contact bridge sit above the motor. */
+ g.appendChild(mk("rect",{x:79,y:10,width:108,height:29,rx:14,fill:gold,stroke:"#69552d","stroke-width":2}));
+ g.appendChild(mk("path",{d:"M 92 14 H 172",stroke:"rgba(255,255,255,.58)","stroke-width":2.2,"stroke-linecap":"round"}));
+ g.appendChild(mk("rect",{x:78,y:15,width:13,height:19,rx:4,fill:alloy,stroke:"#4c5658","stroke-width":1}));
+ g.appendChild(mk("rect",{x:176,y:15,width:13,height:19,rx:4,fill:alloy,stroke:"#4c5658","stroke-width":1}));
+ const movingPlunger=mk("g",{class:"starter-plunger","data-part-id":p.id,transform:`translate(${-plunger*12} 0)`});
+ movingPlunger.appendChild(mk("rect",{x:106,y:18,width:52,height:10,rx:5,fill:"#d3d8d6",stroke:"#596568","stroke-width":1.1}));
+ movingPlunger.appendChild(mk("line",{x1:107,y1:23,x2:86,y2:46,stroke:"#8f999a","stroke-width":3,"stroke-linecap":"round"}));g.appendChild(movingPlunger);
+ const bridge=mk("g",{class:"starter-contact-bridge","data-part-id":p.id,transform:`translate(${-plunger*12} 0)`});
+ bridge.appendChild(mk("rect",{x:164,y:16,width:15,height:13,rx:2,fill:p.contactClosed?"#e6a23f":"#8b6334",stroke:"#4b3219","stroke-width":1}));bridge.appendChild(mk("line",{x1:171,y1:29,x2:171,y2:45,stroke:"#d89d4b","stroke-width":3}));g.appendChild(bridge);
+
+ /* The fork is mechanically simulated, but is hidden behind the cast
+    reduction housing in this exterior-view artwork. */
+ const bendix=mk("g",{class:"starter-bendix-large","data-part-id":p.id,transform:`translate(${-engagement*16} 0)`});
+ bendix.appendChild(mk("rect",{x:29,y:62,width:34,height:14,rx:5,fill:"#899497",stroke:"#344046","stroke-width":1.3}));
+ bendix.appendChild(mk("circle",{cx:31,cy:69,r:12,fill:"#4a585d",stroke:"#152024","stroke-width":1.8}));
+ for(let a=0;a<360;a+=36){const rad=a*Math.PI/180;bendix.appendChild(mk("line",{x1:31+Math.cos(rad)*9,y1:69+Math.sin(rad)*9,x2:31+Math.cos(rad)*14,y2:69+Math.sin(rad)*14,stroke:"#111b1e","stroke-width":2,"stroke-linecap":"round"}));}
+ bendix.appendChild(mk("circle",{cx:31,cy:69,r:3.8,fill:"#d2d9d8",stroke:"#29353a","stroke-width":1}));g.appendChild(bendix);
+
+ /* S, B and GND are the only external harness terminals. */
+ external.forEach(pin=>{const t=starterPinLocal(pin),meta=DEF.STARTER.pins.find(item=>item[0]===pin);
    const terminal=mk("circle",{cx:t.x,cy:t.y,r:8,fill:meta[2],stroke:"#12161b","stroke-width":2,class:"pin"});terminal.dataset.pid=p.id+"."+pin;
    terminal.appendChild(mk("title",{},`${p.id}.${pin} — ${meta[1]}`));g.appendChild(terminal);appendStandardPinLabel(g,t,pin,"STARTER");
  });
- const testPads=[{pin:"C",label:"C\nCONTACT"},{pin:"BR+",label:"BR+\nFIELD"},{pin:"BR-",label:"BR−\nBRUSH"}];
- testPads.forEach(({pin,label})=>{const t=starterPinLocal(pin),pad=mk("circle",{cx:t.x,cy:t.y,r:5.6,fill:pin==="C"?"#d6a447":"#8fc5d5",stroke:"#17242a","stroke-width":1.5,class:"pin"});
-   pad.dataset.pid=p.id+"."+pin;pad.appendChild(mk("title",{},`${p.id}.${pin} — จุดทดสอบภายใน ${label.replace("\n"," ")}`));g.appendChild(pad);
-   label.split("\n").forEach((line,i)=>g.appendChild(mk("text",{x:t.x+(pin==="C"?12:-2),y:t.y-8+i*7,"text-anchor":"middle","font-size":5.6,"font-weight":700,fill:"#344454"},line)));
- });
- g.appendChild(mk("text",{x:122,y:106,"text-anchor":"middle","font-size":7.2,"font-weight":700,fill:faultColor},mode==="NORMAL"?"SOLENOID • BENDIX • ARMATURE":STARTER_FAULTS[mode].label));
- const indicator=mk("circle",{class:"component-live-indicator",cx:d.w-30,cy:12,r:8,fill:p.overload?"#e05252":p.lit?"#ffe680":"#e3e8ee",stroke:p.overload?"#b42318":p.lit?"#ffd400":"#c7cfd8","stroke-width":p.lit||p.overload?2:1});
- indicator.appendChild(mk("title",{},p.overload?"⚠ Locked Rotor":p.motorSpinning?"กำลังหมุน":"รอไฟ S, B และ GND"));g.appendChild(indicator);
+ /* State is shown in the Properties panel.  Keep the exterior clean rather
+    than floating a diagnostic label and status lamp over a realistic starter. */
  const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"});
  gear.appendChild(mk("circle",{cx:d.w-10,cy:12,r:10,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));gear.appendChild(mk("text",{x:d.w-10,y:16,"text-anchor":"middle","font-size":12,fill:"#334155"},"⚙"));
  gear.appendChild(mk("title",{},"ตั้งค่ามอเตอร์สตาร์ท"));gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;render();};g.appendChild(gear);
  g.appendChild(mk("title",{},`Starter cutaway • S/50 ${fmtV(p.sVoltage||0)} • B/30 ${fmtV(p.motorVoltage||0)} • ${Math.round(p.rpm||0)} rpm`));
+ return g;
+}
+/* Bench DC power supply inspired by a real laboratory unit: recessed dual
+   display, current/voltage controls, power switch, vents and binding posts. */
+function realisticPsu(p){
+ const d=DEF.PSU,on=componentEnabled(p)&&!p.damaged,voltage=on?Math.max(0,Number(p.val)||0):0,current=Math.max(0,Number(p.actualCurrent)||0);
+ const g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-psu",opacity:p.damaged?.52:1});g.dataset.pid=p.id;
+ g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#263545"},componentName(p)));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:58,rx:108,ry:64,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ /* White metal enclosure with a visible right-side depth/vent panel. */
+ g.appendChild(mk("path",{d:"M 188 15 L 216 27 V 91 L 189 104 Z",fill:"#c7cbcd",stroke:"#838a8d","stroke-width":1.5}));
+ for(let y=38;y<=77;y+=7)g.appendChild(mk("line",{x1:199,y1:y,x2:211,y2:y-3,stroke:"#858d91","stroke-width":1.2,"stroke-linecap":"round"}));
+ g.appendChild(mk("rect",{x:10,y:13,width:181,height:92,rx:10,fill:"#ebedeb",stroke:"#878e91","stroke-width":2}));
+ g.appendChild(mk("path",{d:"M 17 20 H 180",stroke:"rgba(255,255,255,.9)","stroke-width":2,"stroke-linecap":"round"}));
+ /* Carry handle. */
+ g.appendChild(mk("path",{d:"M 82 13 V 5 Q 101 -2 122 5 V 13",fill:"none",stroke:"#4a5154","stroke-width":5,"stroke-linecap":"round"}));
+ g.appendChild(mk("path",{d:"M 87 11 V 6 Q 102 1 118 6 V 11",fill:"none",stroke:"#d9dddb","stroke-width":2,"stroke-linecap":"round"}));
+ g.appendChild(mk("text",{x:22,y:30,"font-size":9,"font-weight":800,fill:"#4a5158","letter-spacing":.7},"AUTOLAB  DPS-3010"));
+ g.appendChild(mk("text",{x:171,y:30,"text-anchor":"end","font-size":6.5,"font-weight":700,fill:"#7a8184"},"DC POWER SUPPLY"));
+ /* Twin LED readout: current red / voltage green. */
+ g.appendChild(mk("rect",{x:25,y:35,width:151,height:29,rx:4,fill:"#111718",stroke:"#697174","stroke-width":2}));
+ g.appendChild(mk("text",{x:39,y:45,"font-size":6.5,"font-weight":800,fill:"#f3f5f3"},"A"));
+ g.appendChild(mk("text",{x:143,y:45,"font-size":6.5,"font-weight":800,fill:"#f3f5f3"},"V"));
+ g.appendChild(mk("text",{"data-psu-field":"current","data-psu-id":p.id,x:82,y:59,"text-anchor":"middle","font-family":"Consolas,monospace","font-size":20,"font-weight":700,fill:on?"#fa5252":"#632a2a"},current.toFixed(2)));
+ g.appendChild(mk("text",{"data-psu-field":"voltage","data-psu-id":p.id,x:152,y:59,"text-anchor":"middle","font-family":"Consolas,monospace","font-size":20,"font-weight":700,fill:on?"#b9f56c":"#435d35"},voltage.toFixed(1)));
+ g.appendChild(mk("text",{x:99,y:73,"text-anchor":"middle","font-size":5.7,"font-weight":700,fill:"#8a9192"},"C.C."));
+ g.appendChild(mk("text",{x:142,y:73,"text-anchor":"middle","font-size":5.7,"font-weight":700,fill:on?"#2ca25f":"#56605c"},"C.V."));
+ const knob=(x,y,caption)=>{g.appendChild(mk("circle",{cx:x,cy:y,r:11,fill:"#d8dcda",stroke:"#6d7679","stroke-width":1.3}));g.appendChild(mk("circle",{cx:x,cy:y,r:7,fill:"#b8bfbd",stroke:"#eef0ee","stroke-width":1}));g.appendChild(mk("line",{x1:x,y1:y,x2:x+3,y2:y-5,stroke:"#555e60","stroke-width":1.4,"stroke-linecap":"round"}));g.appendChild(mk("text",{x,y:y+18,"text-anchor":"middle","font-size":5.8,"font-weight":700,fill:"#535b5e"},caption));};
+ knob(42,83,"I FINE");knob(73,83,"I COARSE");knob(125,83,"V FINE");knob(156,83,"V COARSE");
+ const power=mk("g",{class:"no-drag",style:"cursor:pointer"});
+ power.appendChild(mk("rect",{x:20,y:91,width:39,height:12,rx:6,fill:on?"#247f62":"#4b5657",stroke:"#293333","stroke-width":1}));
+ power.appendChild(mk("text",{x:39.5,y:99.4,"text-anchor":"middle","font-size":6.3,"font-weight":800,fill:"#e8f8f1"},on?"POWER ON":"POWER OFF"));
+ power.onpointerup=e=>{e.stopPropagation();snap();p.disabled=!p.disabled;playUiSound("click");render();};power.appendChild(mk("title",{},"เปิด/ปิดแหล่งจ่ายไฟ"));g.appendChild(power);
+ /* Non-interactive earth post plus the actual black / red output posts. */
+ g.appendChild(mk("circle",{cx:112,cy:96,r:6,fill:"#0b8992",stroke:"#153d42","stroke-width":1.5}));g.appendChild(mk("text",{x:112,y:107,"text-anchor":"middle","font-size":5.5,"font-weight":700,fill:"#3b5557"},"GND"));
+ [["-",88,"#252b2f"],["+",142,"#d94242"]].forEach(([pin,x,fill])=>{const t=realisticTerminal(p,pin==="-"?0:1);g.appendChild(mk("line",{x1:x,y1:95,x2:t.x,y2:t.y-7,stroke:fill,"stroke-width":3,"stroke-linecap":"round"}));const post=mk("circle",{cx:t.x,cy:t.y,r:8,fill,stroke:"#11171a","stroke-width":2,class:"pin"});post.dataset.pid=p.id+"."+pin;post.appendChild(mk("title",{},`${p.id}.${pin} — ${pin==="+"?"เอาต์พุตบวก":"เอาต์พุตลบ"}`));g.appendChild(post);g.appendChild(mk("text",{x:t.x,y:t.y+19,"text-anchor":"middle","font-size":8,"font-weight":800,fill:pin==="+"?"#b42318":"#34424a"},pin));});
+ const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"});gear.appendChild(mk("circle",{class:"component-settings-bg",cx:d.w-10,cy:12,r:10,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));gear.appendChild(mk("text",{x:d.w-10,y:16,"text-anchor":"middle","font-size":12,fill:"#334155"},"⚙"));gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;render();};g.appendChild(gear);
+ g.appendChild(mk("title",{},`Bench PSU • ${voltage.toFixed(1)} V • ${current.toFixed(2)} A`));
+ return g;
+}
+/* Automotive relay, drawn as an open-frame cutaway: copper coil, iron core,
+   return spring and a moving common blade.  SPST keeps 85/86/30/87 only;
+   SPDT additionally exposes the resting 87a contact. */
+function realisticRelay(p){
+ const d=DEF.RELAY,spdt=relayType(p)==="SPDT",energized=!!p.energized,coilVoltage=Math.abs(Number(p.coilVoltage)||0),angle=Number.isFinite(Number(p.relayAngle))?Number(p.relayAngle):(energized?-22:(spdt?22:10)),plungerOffset=Number.isFinite(Number(p.relayPlunger))?Number(p.relayPlunger):(energized?11:0);
+ const g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-relay",opacity:componentEnabled(p)&&!p.damaged?1:.45});g.dataset.pid=p.id;
+ g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#263545"},componentName(p)));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:66,rx:106,ry:72,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ /* Black phenolic base and transparent cover outline — based on the exposed
+    copper-winding relay construction in the supplied references. */
+ g.appendChild(mk("path",{d:"M 12 18 Q 16 10 27 10 H 193 Q 207 10 211 22 V 102 H 12 Z",fill:"rgba(34,45,49,.22)",stroke:"#5e6b6e","stroke-width":2}));
+ g.appendChild(mk("rect",{x:10,y:94,width:202,height:16,rx:3,fill:"#1f2729",stroke:"#0d1416","stroke-width":2}));
+ g.appendChild(mk("rect",{x:16,y:99,width:190,height:5,rx:2,fill:"#3a474a",opacity:.82}));
+ /* Coil bobbin and copper winding. */
+ g.appendChild(mk("rect",{x:29,y:24,width:57,height:66,rx:6,fill:"#172126",stroke:"#071013","stroke-width":2}));
+ const glow=mk("rect",{class:"relay-coil-glow","data-relay-id":p.id,x:33,y:28,width:49,height:58,rx:4,fill:"#ff7b4a",opacity:energized?".26":".03"});g.appendChild(glow);
+ for(let y=30;y<=84;y+=3.15)g.appendChild(mk("path",{d:`M 34 ${y} q 24 -3 47 0`,fill:"none",stroke:energized?"#ff8754":"#b95e32","stroke-width":2.05,"stroke-linecap":"round"}));
+ g.appendChild(mk("rect",{x:51,y:18,width:12,height:78,rx:3,fill:"#7e8988",stroke:"#344042","stroke-width":2}));
+ g.appendChild(mk("rect",{x:43,y:17,width:28,height:7,rx:2,fill:"#3d494a",stroke:"#182225","stroke-width":1.2}));
+ g.appendChild(mk("rect",{x:43,y:89,width:28,height:7,rx:2,fill:"#3d494a",stroke:"#182225","stroke-width":1.2}));
+ /* Iron yoke, plunger and return spring. */
+ g.appendChild(mk("path",{d:"M 66 24 H 106 V 37 H 80 V 82 H 106 V 95 H 66",fill:"none",stroke:"#778384","stroke-width":7,"stroke-linejoin":"round"}));
+ const plunger=mk("g",{class:"relay-plunger","data-relay-id":p.id,transform:`translate(${plungerOffset} 0)`});
+ plunger.appendChild(mk("rect",{x:83,y:51,width:47,height:15,rx:4,fill:"#aeb7b7",stroke:"#394446","stroke-width":1.6}));
+ plunger.appendChild(mk("rect",{x:89,y:54,width:37,height:9,rx:3,fill:"#d1d6d4",stroke:"#738081","stroke-width":.8}));g.appendChild(plunger);
+ for(let x=89;x<=104;x+=4)g.appendChild(mk("line",{x1:x,y1:71,x2:x+3,y2:78,stroke:"#91a0a0","stroke-width":1.1}));
+ /* Fixed contacts 87 (NO) and, only for SPDT, 87a (NC). */
+ const contact=(y,label,kind)=>{const active=(kind==="NO"&&energized)||(kind==="NC"&&!energized);g.appendChild(mk("rect",{class:"relay-fixed-contact","data-relay-contact":kind,"data-relay-id":p.id,x:172,y:y-6,width:20,height:12,rx:2,fill:active?"#e8b84e":"#a16d28",stroke:"#4f3514","stroke-width":1.2}));g.appendChild(mk("circle",{cx:178,y,r:3.2,fill:active?"#fff0a3":"#d49b3f",stroke:"#6e4817","stroke-width":.8}));g.appendChild(mk("text",{x:201,y:y+3,"font-size":7,"font-weight":800,fill:active?"#13844b":"#6d5a43"},label));};
+ contact(35,"87","NO");if(spdt)contact(82,"87a","NC");
+ /* The spring blade pivots at terminal 30 and swings from NC to NO. */
+ const armature=mk("g",{class:"relay-armature","data-relay-id":p.id,transform:`rotate(${angle} 123 59)`});
+ armature.appendChild(mk("circle",{cx:123,cy:59,r:6,fill:"#697678",stroke:"#263133","stroke-width":1.5}));
+ armature.appendChild(mk("path",{d:"M 123 59 L 169 59",fill:"none",stroke:"#8d9998","stroke-width":6,"stroke-linecap":"round"}));
+ armature.appendChild(mk("path",{d:"M 126 58 L 168 58",fill:"none",stroke:"#d7dcda","stroke-width":1.25,"stroke-linecap":"round",opacity:.7}));
+ armature.appendChild(mk("circle",{cx:169,cy:59,r:4.3,fill:"#daa93e",stroke:"#614216","stroke-width":1.1}));g.appendChild(armature);
+ g.appendChild(mk("path",{d:"M 115 39 q 13 8 5 19",fill:"none",stroke:"#525f61","stroke-width":4,"stroke-linecap":"round"}));
+ g.appendChild(mk("text",{class:"relay-state-text","data-relay-id":p.id,x:110,y:20,"text-anchor":"middle","font-size":7.5,"font-weight":800,fill:energized?"#0a7d3f":"#59666a"},energized?"COIL ENERGISED":"COIL REST"));
+ g.appendChild(mk("text",{x:110,y:118,"text-anchor":"middle","font-size":7.5,"font-weight":800,fill:"#4f5b5f"},spdt?"5 PIN • SPDT":"4 PIN • SPST"));
+ /* Physical terminal studs and their stamped automotive pin numbers. */
+ const anchors={"COIL+":{x:38,y:92},"COIL-":{x:76,y:92},COM:{x:123,y:87},NO:{x:182,y:44},NC:{x:182,y:82}};
+ pinsFor(p).forEach(pin=>{const name=pin[0],terminal=relayPinLocal(p,name),anchor=anchors[name]||{x:terminal.x,y:103};
+   g.appendChild(mk("path",{d:`M ${anchor.x} ${anchor.y} V 111 L ${terminal.x} ${terminal.y-8}`,fill:"none",stroke:name==="COIL+"?"#bd5a48":name==="COIL-"?"#55636c":"#a17c31","stroke-width":2.4,"stroke-linecap":"round","stroke-linejoin":"round"}));
+   const stud=mk("circle",{cx:terminal.x,cy:terminal.y,r:8,fill:pin[2],stroke:"#12161b","stroke-width":2,class:"pin"});stud.dataset.pid=p.id+"."+name;stud.appendChild(mk("title",{},`${p.id}.${name} — ${pin[1]}`));g.appendChild(stud);appendRelayPinLabel(g,terminal,name);
+ });
+ const status=mk("g",{class:"relay-live-status","data-relay-id":p.id});status.appendChild(mk("circle",{cx:200,cy:26,r:8,fill:energized?"#55d883":"#d8dee1",stroke:energized?"#147a3d":"#85939a","stroke-width":1.5}));status.appendChild(mk("circle",{cx:200,cy:26,r:3,fill:energized?"#eaffd7":"#f5f7f8",opacity:energized?1:.6}));g.appendChild(status);
+ const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"});gear.appendChild(mk("circle",{class:"component-settings-bg",cx:d.w-10,cy:12,r:10,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));gear.appendChild(mk("text",{x:d.w-10,y:16,"text-anchor":"middle","font-size":12,fill:"#334155"},"⚙"));gear.appendChild(mk("title",{},"ตั้งค่ารุ่นรีเลย์และคอยล์"));gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;render();};g.appendChild(gear);
+ g.appendChild(mk("title",{},`${spdt?"รีเลย์ 5 ขา SPDT":"รีเลย์ 4 ขา SPST"} • คอยล์ 85–86 ${coilVoltage.toFixed(2)} V • ${energized?"30 → 87":"30 → "+(spdt?"87a":"เปิด")}`));
+ return g;
+}
+function realisticObd2(p){
+ const d=DEF.OBD2,connected=S().parts.some(v=>v.type==="VCI"&&v.dlcId===p.id),g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-obd2",opacity:componentEnabled(p)?1:.45});g.dataset.pid=p.id;
+ g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#263545"},componentName(p)));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:d.w/2,cy:69,rx:136,ry:67,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ g.appendChild(mk("path",{d:"M 17 21 H 269 L 250 106 H 36 Z",fill:"#1d242a",stroke:"#090d10","stroke-width":3,"stroke-linejoin":"round"}));
+ g.appendChild(mk("path",{d:"M 25 28 H 261 L 245 97 H 41 Z",fill:"#333d43",stroke:"#5c6a70","stroke-width":1.4}));
+ g.appendChild(mk("text",{x:143,y:18,"text-anchor":"middle","font-size":8,"font-weight":800,"letter-spacing":1,fill:"#48575c"},"SAE J1962  •  DLC"));
+ for(let row=0;row<2;row++)for(let col=0;col<8;col++){const n=row*8+col+1,x=52+col*23,y=42+row*26,highlight=[4,5,6,14,16].includes(n);g.appendChild(mk("rect",{x,y,width:15,height:13,rx:1.5,fill:highlight?"#c8963e":"#14191d",stroke:highlight?"#e0bf63":"#59636a","stroke-width":highlight?1.2:.65}));g.appendChild(mk("text",{x:x+7.5,y:y+9.4,"text-anchor":"middle","font-size":5.3,"font-weight":700,fill:highlight?"#241b0b":"#a6b1b7"},n));}
+ g.appendChild(mk("rect",{x:104,y:82,width:78,height:13,rx:5,fill:connected?"#135c44":"#2a3238",stroke:connected?"#54d789":"#59666d","stroke-width":1}));g.appendChild(mk("text",{x:143,y:91.2,"text-anchor":"middle","font-size":6.4,"font-weight":800,fill:connected?"#b8ffd2":"#dce3e6"},connected?"VCI CONNECTED":"VCI READY"));
+ const internal={"B+":{x:214,y:55},CHASSIS:{x:121,y:81},SGND:{x:144,y:81},"CAN-H":{x:167,y:55},"CAN-L":{x:190,y:81}};
+ pinsFor(p).forEach(pin=>{const name=pin[0],terminal=obdPinLocal(name),a=internal[name]||{x:terminal.x,y:105};g.appendChild(mk("path",{d:`M ${a.x} ${a.y} V 109 L ${terminal.x} ${terminal.y-8}`,fill:"none",stroke:pin[2],"stroke-width":2.4,"stroke-linecap":"round","stroke-linejoin":"round"}));const stud=mk("circle",{cx:terminal.x,cy:terminal.y,r:8,fill:pin[2],stroke:"#10161a","stroke-width":2,class:"pin"});stud.dataset.pid=p.id+"."+name;stud.appendChild(mk("title",{},`${p.id}.${name} — ${pin[1]}`));g.appendChild(stud);appendObdPinLabel(g,terminal,name);});
+ const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"});gear.appendChild(mk("circle",{class:"component-settings-bg",cx:d.w-10,cy:12,r:10,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));gear.appendChild(mk("text",{x:d.w-10,y:16,"text-anchor":"middle","font-size":12,fill:"#334155"},"⚙"));gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;render();};g.appendChild(gear);
+ return g;
+}
+function realisticVci(p){
+ const d=DEF.VCI,dlc=p.dlcId&&findP(p.dlcId),connected=!!dlc,g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-vci",opacity:componentEnabled(p)?1:.45});g.dataset.pid=p.id;
+ g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":10.5,"font-weight":800,fill:"#263545"},componentName(p)));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:83,cy:49,rx:83,ry:52,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ g.appendChild(mk("path",{d:"M 17 24 Q 23 14 39 14 H 122 Q 143 14 151 29 L 158 70 Q 146 84 125 86 H 31 Q 16 80 13 66 Z",fill:"#23282e",stroke:"#0c1014","stroke-width":3}));
+ g.appendChild(mk("path",{d:"M 23 26 Q 30 20 43 20 H 117 Q 132 20 141 31 L 146 62 Q 135 75 121 76 H 34 Q 24 70 22 60 Z",fill:"#9d2632",stroke:"#4e131a","stroke-width":1.4}));
+ g.appendChild(mk("rect",{x:43,y:31,width:76,height:27,rx:4,fill:"#12191e",stroke:"#717f86","stroke-width":1.2}));g.appendChild(mk("text",{x:81,y:43,"text-anchor":"middle","font-size":8,"font-weight":800,fill:"#f3f5f7"},"X-431 VCI"));
+ [0,1,2].forEach(i=>g.appendChild(mk("path",{d:`M ${77-i*5} ${55-i*3} q ${4+i*4} ${-5-i*3} ${8+i*8} 0`,fill:"none",stroke:connected?"#67e8a9":"#75828a","stroke-width":1.25,"stroke-linecap":"round"})));
+ g.appendChild(mk("path",{d:"M 151 37 h16 v27 h-16",fill:"#171d21",stroke:"#69767c","stroke-width":2}));
+ const plug=mk("g",{class:"no-drag",style:"cursor:pointer"});plug.appendChild(mk("rect",{x:42,y:91,width:83,height:21,rx:10,fill:connected?"#137853":"#465057",stroke:connected?"#0a4b35":"#1d272d","stroke-width":1.5}));plug.appendChild(mk("text",{x:83.5,y:105,"text-anchor":"middle","font-size":8,"font-weight":800,fill:"#f5faf8"},connected?"ถอด VCI จาก DLC":"คลิกเพื่อเสียบ DLC"));plug.onpointerup=e=>{e.stopPropagation();toggleVciConnection(p);};plug.appendChild(mk("title",{},"ย้าย VCI ใกล้ DLC แล้วคลิกเพื่อเสียบ/ถอด"));g.appendChild(plug);
+ return g;
+}
+function launchTouch(g,x,y,w,h,label,action,fill="#233f58"){const b=mk("g",{class:"no-drag launch-touch",style:"cursor:pointer","data-launch-action":action});b.appendChild(mk("rect",{x,y,width:w,height:h,rx:6,fill,stroke:"rgba(255,255,255,.34)","stroke-width":.8}));b.appendChild(mk("text",{x:x+w/2,y:y+h/2+3.5,"text-anchor":"middle","font-size":label.length>14?6.2:7.3,"font-weight":800,fill:"#f5f8fa","pointer-events":"none"},label));g.appendChild(b);return b;}
+function realisticLaunch(p){
+ const d=DEF.LAUNCH,scale=Math.max(.70,Math.min(1.35,Number(p.scannerScale)||1)),page=scannerPage(p),status=diagnosticDlcStatus(),engine=ensureEngineState(),dtcs=diagnosticDtcs(),g=mk("g",{transform:`translate(${p.x},${p.y}) scale(${scale})`,class:"realistic-launch"});g.dataset.pid=p.id;
+ g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#263545"},componentName(p)));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:165,cy:116,rx:158,ry:110,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ g.appendChild(mk("path",{d:"M 13 24 Q 20 8 39 8 H 291 Q 310 8 317 24 V 208 Q 310 224 291 224 H 39 Q 20 224 13 208 Z",fill:"#221d20",stroke:"#080607","stroke-width":4}));
+ g.appendChild(mk("path",{d:"M 19 31 Q 25 15 42 15 H 288 Q 304 15 311 31 V 200 Q 304 217 288 217 H 42 Q 25 217 19 200 Z",fill:"#bc2634",stroke:"#63131c","stroke-width":2}));
+ g.appendChild(mk("rect",{x:31,y:31,width:268,height:157,rx:7,fill:"#102331",stroke:"#060d13","stroke-width":3}));
+ g.appendChild(mk("rect",{x:36,y:36,width:258,height:147,rx:4,fill:page==="OFF"?"#172128":"#dbe8ee",stroke:"#536671","stroke-width":1.1}));
+ const screen=mk("g",{class:"launch-screen","data-launch-id":p.id});g.appendChild(screen);
+ const text=(x,y,value,opts={})=>screen.appendChild(mk("text",{x,y,"text-anchor":opts.anchor||"start","font-size":opts.size||9,"font-weight":opts.weight||700,fill:opts.fill||"#143147","font-family":opts.mono?"Consolas,monospace":"Tahoma,Segoe UI,sans-serif"},value));
+ const line=(y)=>screen.appendChild(mk("line",{x1:44,y1:y,x2:286,y2:y,stroke:"#b4c5cf","stroke-width":.7}));
+ if(page==="OFF"){text(165,109,"LAUNCH X-431",{anchor:"middle",size:19,fill:"#74848c"});text(165,128,"กด POWER เพื่อเปิดเครื่อง",{anchor:"middle",size:9,fill:"#9badb5"});}
+ else if(page==="BOOT"){text(165,102,"LAUNCH",{anchor:"middle",size:27,fill:"#c21f30"});text(165,122,"X-431 PRO DIAGNOSTIC",{anchor:"middle",size:9,fill:"#23445b"});screen.appendChild(mk("rect",{x:72,y:139,width:186,height:6,rx:3,fill:"#bdcad1"}));screen.appendChild(mk("rect",{x:72,y:139,width:112,height:6,rx:3,fill:"#d42b3d"}));}
+ else if(page==="HOME"){text(49,52,"X-431  •  รถยนต์ไทย",{size:10,fill:"#144e83"});text(277,52,status.ok?"ONLINE":"OFFLINE",{anchor:"end",size:8,fill:status.ok?"#087a3f":"#b42318"});launchTouch(screen,50,67,106,43,"Intelligent Diagnose","INTELLIGENT","#1c7ed6");launchTouch(screen,174,67,106,43,"Local Diagnose","LOCAL","#345b7e");launchTouch(screen,50,123,106,43,"OBD II","OBD","#2b8a6e");launchTouch(screen,174,123,106,43,"Settings","SETTINGS","#6c757d");}
+ else if(page==="SETTINGS"){text(165,52,"Settings / Workshop",{anchor:"middle",size:12,fill:"#144e83"});line(61);text(50,80,"VCI Bluetooth",{size:9});text(278,80,status.vci?"PAIRED":"NOT CONNECTED",{anchor:"end",size:8,fill:status.vci?"#087a3f":"#b42318"});text(50,101,"DLC Supply",{size:9});text(278,101,`${Number(status.volts||0).toFixed(2)} V`,{anchor:"end",size:8,mono:true,fill:status.volts>=9?"#087a3f":"#b42318"});text(50,122,"Vehicle Profile",{size:9});text(278,122,"ISUZU 1.9 Ddi",{anchor:"end",size:8,fill:"#344b5a"});launchTouch(screen,104,142,122,26,"Back","BACK","#6c757d");}
+ else if(page==="VIN"){text(165,77,"Intelligent Diagnose",{anchor:"middle",size:13,fill:"#144e83"});text(165,104,"กำลังอ่าน VIN / Auto Detect...",{anchor:"middle",size:9});screen.appendChild(mk("rect",{x:65,y:121,width:200,height:9,rx:4,fill:"#b2c3cb"}));screen.appendChild(mk("rect",{x:65,y:121,width:148,height:9,rx:4,fill:"#1f9d66"}));text(165,151,"ISUZU • 1.9 Ddi Blue Power",{anchor:"middle",size:9,fill:"#344b5a"});}
+ else if(page==="TOPOLOGY"){text(165,51,"Health Report / Topology",{anchor:"middle",size:12,fill:"#144e83"});const bad=dtcs.length>0;[["ECM",86,108,bad?"#d94841":"#35a86b","ECM"],["ABS",165,78,"#35a86b",null],["BCM",245,108,"#35a86b",null],["TCM",165,145,"#35a86b",null]].forEach(([name,x,y,color,action])=>{const node=mk("g",{class:action?"no-drag":"",style:action?"cursor:pointer":""});node.appendChild(mk("circle",{cx:x,cy:y,r:24,fill:color,stroke:"#ffffff","stroke-width":2}));node.appendChild(mk("text",{x,y:y+4,"text-anchor":"middle","font-size":8,"font-weight":800,fill:"#fff"},name));if(action)node.onpointerup=e=>{e.stopPropagation();scannerAction(p,action);};screen.appendChild(node);});screen.appendChild(mk("path",{d:"M 110 105 L 141 82 M 188 82 L 221 105 M 165 103 V 121",fill:"none",stroke:"#7e96a5","stroke-width":2}));text(165,174,bad?`${dtcs.length} FAULT(S) DETECTED`:"ALL MODULES NORMAL",{anchor:"middle",size:8,fill:bad?"#b42318":"#087a3f"});}
+ else if(page==="ECM"){text(165,54,"ECM / Engine Control",{anchor:"middle",size:13,fill:"#144e83"});launchTouch(screen,52,73,96,34,"Read Fault Code","DTC","#c23b45");launchTouch(screen,181,73,96,34,"Live Data","DATA","#1c7ed6");launchTouch(screen,52,124,96,34,"Actuation Test","ACTIVE","#2b8a6e");launchTouch(screen,181,124,96,34,"Back","BACK","#6c757d");}
+ else if(page==="DTC"){text(50,53,"ECM • Diagnostic Trouble Codes",{size:10,fill:"#144e83"});line(61);const summary=dtcs.length?dtcs.slice(0,2).map(x=>`${x.code} ${x.text}`).join(" • "):"NO DTC — ระบบปกติ",dtcField=text(50,81,summary,{size:7.3,fill:dtcs.length?"#b42318":"#087a3f"});dtcField.setAttribute("data-launch-field","DTC");const milField=text(50,111,`MIL: ${engine.mil?"ON":"OFF"}   Stored: ${dtcs.length}`,{size:8,fill:engine.mil?"#b42318":"#087a3f"});milField.setAttribute("data-launch-field","MIL");launchTouch(screen,50,137,107,28,"Clear Fault Code","CLEAR","#2b8a6e");launchTouch(screen,171,137,107,28,"Back","BACK","#6c757d");}
+ else if(page==="DATA"){text(50,52,"ECM • Live Data Stream",{size:10,fill:"#144e83"});line(59);[["Engine RPM","RPM"],["System Voltage","VOLT"],["MAF Air Flow","MAF"],["MAP Pressure","MAP"],["APP1 / APP2","APP"]].forEach(([label,key],i)=>{const y=78+i*17;text(50,y,label,{size:7.8});text(276,y,"—",{anchor:"end",size:8,mono:true,fill:"#075c83"});const field=screen.lastChild;field.setAttribute("data-launch-field",key);line(y+5);});launchTouch(screen,210,151,68,23,"Back","BACK","#6c757d");}
+ else if(page==="ACTIVE"){text(50,52,"ECM • Active Test",{size:10,fill:"#144e83"});launchTouch(screen,49,70,110,29,"Cooling Fan ON","TEST_FAN_ON","#1c7ed6");launchTouch(screen,171,70,108,29,"Fan OFF","TEST_FAN_OFF","#6c757d");launchTouch(screen,49,110,110,29,"Pump Relay ON","TEST_PUMP_ON","#2b8a6e");launchTouch(screen,171,110,108,29,"Relay OFF","TEST_PUMP_OFF","#6c757d");launchTouch(screen,49,150,230,24,engine.injectorKill?"Restore Injector / Restart":"Injector Kill Test","TEST_INJECTOR_KILL","#c23b45");}
+ else if(page==="ERROR"){text(165,79,"COMMUNICATION FAILED",{anchor:"middle",size:13,fill:"#b42318"});text(165,105,p.scannerError||"ตรวจสอบการเชื่อมต่อ",{anchor:"middle",size:8,fill:"#5d4950"});text(165,125,"ตรวจ VCI • DLC Pin 16/4/5 • CAN • IGN ON",{anchor:"middle",size:6.9,fill:"#5d4950"});launchTouch(screen,115,145,100,25,"Back","BACK","#6c757d");}
+ const hardware=mk("g",{class:"no-drag",style:"cursor:pointer"});hardware.appendChild(mk("rect",{x:132,y:196,width:66,height:19,rx:9,fill:"#252c32",stroke:"#090d10","stroke-width":1.5}));hardware.appendChild(mk("circle",{cx:146,y:205.5,r:5,fill:page!=="OFF"?"#40d479":"#d14a50"}));hardware.appendChild(mk("text",{x:173,y:209,"text-anchor":"middle","font-size":7,"font-weight":800,fill:"#f4f7f8"},"POWER"));hardware.onpointerup=e=>{e.stopPropagation();scannerAction(p,"POWER");};g.appendChild(hardware);launchTouch(g,245,198,22,17,"−","SCALE-","#4d5961");launchTouch(g,271,198,22,17,"+","SCALE+","#4d5961");
+ g.querySelectorAll("[data-launch-action]").forEach(button=>button.onpointerup=e=>{e.preventDefault();e.stopPropagation();scannerAction(p,button.getAttribute("data-launch-action"));});
+ return g;
+}
+function realisticCluster(p){
+ const d=DEF.CLUSTER,status=clusterWiringStatus(p),engine=ensureEngineState(),powered=status.powered,rpm=powered?Number(engine.rpm)||0:0,needle=Number.isFinite(Number(p.clusterNeedle))?Number(p.clusterNeedle):-120,g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-cluster",opacity:componentEnabled(p)?1:.45});g.dataset.pid=p.id;
+ g.appendChild(mk("text",{class:"component-title",x:d.w/2,y:-14,"text-anchor":"middle","font-size":11,"font-weight":800,fill:"#263545"},componentName(p)));
+ if(sel===p.id)g.appendChild(mk("ellipse",{cx:155,cy:71,rx:147,ry:70,fill:"none",stroke:"#ff8c42","stroke-width":2,"stroke-dasharray":"5 4","pointer-events":"none"}));
+ g.appendChild(mk("path",{d:"M 10 22 Q 22 8 44 8 H 266 Q 289 8 300 22 V 109 Q 290 122 268 122 H 42 Q 20 122 10 109 Z",fill:"#1f2730",stroke:"#0b1117","stroke-width":3}));
+ g.appendChild(mk("rect",{x:20,y:18,width:270,height:94,rx:10,fill:powered?"#111a22":"#080d11",stroke:"#57646e","stroke-width":1.3}));
+ [88,222].forEach(cx=>{g.appendChild(mk("circle",{cx,cy:68,r:39,fill:"#111820",stroke:"#73818c","stroke-width":1.5}));for(let i=0;i<=8;i++){const a=(-140+i*35)*Math.PI/180,x1=cx+Math.cos(a)*31,y1=68+Math.sin(a)*31,x2=cx+Math.cos(a)*36,y2=68+Math.sin(a)*36;g.appendChild(mk("line",{x1,y1,x2,y2,stroke:powered?"#d9e0e5":"#3e4950","stroke-width":1.2}));}});
+ g.appendChild(mk("text",{x:88,y:36,"text-anchor":"middle","font-size":7,"font-weight":800,fill:"#dce5ea"},"x1000 RPM"));g.appendChild(mk("text",{x:222,y:36,"text-anchor":"middle","font-size":7,"font-weight":800,fill:"#dce5ea"},"km/h"));
+ const tach=mk("g",{class:"cluster-tach-needle","data-cluster-id":p.id,transform:`rotate(${needle} 88 68)`});tach.appendChild(mk("line",{x1:88,y1:68,x2:88,y2:35,stroke:"#ef4b4d","stroke-width":2.8,"stroke-linecap":"round"}));tach.appendChild(mk("circle",{cx:88,cy:68,r:4,fill:"#d9e1e5",stroke:"#202a31","stroke-width":1.2}));g.appendChild(tach);
+ g.appendChild(mk("rect",{x:125,y:59,width:60,height:26,rx:3,fill:powered?"#b7d8a6":"#263036",stroke:"#53636b","stroke-width":1}));g.appendChild(mk("text",{class:"cluster-rpm","data-cluster-id":p.id,x:155,y:70,"text-anchor":"middle","font-size":10,"font-family":"Consolas,monospace","font-weight":800,fill:powered?"#183b2b":"#637078"},String(Math.round(rpm)).padStart(4,"0")));g.appendChild(mk("text",{x:155,y:79,"text-anchor":"middle","font-size":5.5,"font-weight":700,fill:powered?"#284939":"#637078"},powered?"D • ODO 024580":"OFF"));
+ [["MIL",136,"#f3c743","cluster-mil"],["BAT",154,"#e25555","cluster-batt"],["OIL",172,"#e9a44a","cluster-oil"]].forEach(([name,x,color,cls])=>{g.appendChild(mk("circle",{class:cls,"data-cluster-id":p.id,cx:x,cy:98,r:5,fill:color,opacity:powered?"1":"0"}));g.appendChild(mk("text",{x,y:100.6,"text-anchor":"middle","font-size":4.2,"font-weight":800,fill:"#2d2411"},name));});
+ pinsFor(p).forEach(pin=>{const name=pin[0],terminal=clusterPinLocal(name);g.appendChild(mk("line",{x1:terminal.x,y1:108,x2:terminal.x,y2:terminal.y-8,stroke:pin[2],"stroke-width":2.5,"stroke-linecap":"round"}));const stud=mk("circle",{cx:terminal.x,cy:terminal.y,r:8,fill:pin[2],stroke:"#12161b","stroke-width":2,class:"pin"});stud.dataset.pid=p.id+"."+name;stud.appendChild(mk("title",{},`${p.id}.${name} — ${pin[1]}`));g.appendChild(stud);appendClusterPinLabel(g,terminal,name);});
+ const gear=mk("g",{class:"no-drag component-settings",style:"cursor:pointer"});gear.appendChild(mk("circle",{class:"component-settings-bg",cx:d.w-10,cy:12,r:10,fill:"#f4f7fa",stroke:"#94a3b3","stroke-width":1.2}));gear.appendChild(mk("text",{x:d.w-10,y:16,"text-anchor":"middle","font-size":12,fill:"#334155"},"⚙"));gear.onpointerup=e=>{e.stopPropagation();sel=p.id;selWire=null;render();};g.appendChild(gear);
  return g;
 }
 function render(){
@@ -2153,6 +2522,12 @@ function render(){
   S().parts.forEach(p=>{
     if(p.type==="DIODE"){partL.appendChild(realisticDiode(p));return;}
     if(p.type==="STARTER"){partL.appendChild(realisticStarter(p));return;}
+    if(p.type==="RELAY"){partL.appendChild(realisticRelay(p));return;}
+    if(p.type==="OBD2"){partL.appendChild(realisticObd2(p));return;}
+    if(p.type==="VCI"){partL.appendChild(realisticVci(p));return;}
+    if(p.type==="LAUNCH"){partL.appendChild(realisticLaunch(p));return;}
+    if(p.type==="CLUSTER"){partL.appendChild(realisticCluster(p));return;}
+    if(p.type==="PSU"){partL.appendChild(realisticPsu(p));return;}
     const d=DEF[p.type],g=mk("g",{transform:`translate(${p.x},${p.y})`,class:"realistic-component",opacity:componentEnabled(p)?1:.42});
     const analyzer=p.type==="BATT_ANALYZER",art=analyzer?realisticBatteryAnalyzer(p):partIcon(p),sc=ICON_BOX/30;
     if(!analyzer)art.setAttribute("transform",`translate(${(d.w-ICON_BOX)/2},10) scale(${sc})`);
@@ -2338,10 +2713,13 @@ stage.addEventListener("pointerdown",e=>{const P=pt(e);
     if(arm==="FLA_BATT"){newPart.battVoltage=12.6;newPart.battCapacity=65;newPart.battCapacityUnit="Ah";newPart.battMaxCurrent=600;newPart.floodedRiMOhm=4;newPart.electrolyteLevel=100;newPart.floodedFault="NORMAL";newPart.remainingAh=65;newPart.batteryEmpty=false;}
     if(arm==="BATT_ANALYZER"){newPart.analyzerLocation="IN";newPart.analyzerBatteryType="FLOODED";newPart.analyzerStandard="CCA";newPart.analyzerRatedCca=600;newPart.analyzerMenuStep=0;newPart.chargingRipple=.08;newPart.simChargeVoltage=13.8;newPart.engineRunning=false;newPart.testing=false;newPart.powered=false;}
     if(arm==="DIODE")newPart.rot=0;
-    if(arm==="RELAY")newPart.relayType="SPDT";
+    if(arm==="RELAY"){newPart.relayType="SPDT";newPart.relayAngle=22;newPart.relayPlunger=0;}
     if(arm==="TPS"){newPart.tpsConnector="3";newPart.tpsFault="NORMAL";}
     if(arm==="APP"){newPart.appConnector="6";newPart.appFault="NORMAL";newPart.limpMode=false;}
     if(arm==="IGN")newPart.ignitionStage="LOCK";
+    if(arm==="VCI")newPart.dlcId=null;
+    if(arm==="LAUNCH"){newPart.scannerPage="OFF";newPart.scannerScale=1;newPart.scannerAt=0;}
+    if(arm==="CLUSTER"){newPart.clusterNeedle=-120;newPart.clusterPowered=false;}
     if(arm==="STARTER"){newPart.pullInR=.35;newPart.holdInR=.8;newPart.solenoidR=.8;newPart.motorR=.10;newPart.starterFault="NORMAL";newPart.cranking=false;newPart.motorCircuitOn=false;newPart.motorSpinning=false;newPart.solenoidEngaged=false;newPart.contactClosed=false;newPart.bendixPosition=0;newPart.plungerPosition=0;newPart.rotorRpm=0;newPart.rotorAngle=0;}
     if(arm==="RES"){newPart.val=220;newPart.resBandCount=4;newPart.resBands=["red","red","brown","gold"];newPart.resTolerance="gold";newPart.ratedW=.25;newPart.overloadSeconds=0;}
     S().parts.push(newPart);
@@ -2699,6 +3077,28 @@ function bulbLiveData(p,V){
   p.actualVoltage=voltage;p.actualCurrent=current;p.actualPower=data.power;p.hotResistance=resistance;
   return data;
 }
+function fanLiveData(p,V){
+ const P=p.id+".",wiredVoltage=Math.abs((V[P+"A"]??0)-(V[P+"B"]??0)),voltage=p.scanForce?12:wiredVoltage,resistance=loadResistance(p,80),current=p.damaged||!componentEnabled(p)?0:voltage/resistance;
+ const now=performance.now(),last=Number(p.fanMotionAt)||now,dt=Math.max(.004,Math.min(.08,(now-last)/1000));p.fanMotionAt=now;
+ const target=p.damaged||voltage<1.5?0:Math.min(2400,2200*voltage/12),rpm=Math.max(0,Number(p.fanRpm)||0),rate=target>rpm?7000:4200;
+ const next=Math.max(0,rpm+Math.sign(target-rpm)*Math.min(Math.abs(target-rpm),rate*dt));
+ p.fanRpm=next;p.fanAngle=((Number(p.fanAngle)||0)+next*6*dt)%360;p.actualVoltage=voltage;p.actualCurrent=current;p.actualPower=voltage*current;p.lit=next>45;
+ return {voltage,current,power:voltage*current,rpm:next};
+}
+function bellLiveData(p,V){
+ const P=p.id+".",voltage=Math.abs((V[P+"A"]??0)-(V[P+"B"]??0)),resistance=loadResistance(p,160),current=p.damaged||!componentEnabled(p)?0:voltage/resistance;
+ p.actualVoltage=voltage;p.actualCurrent=current;p.actualPower=voltage*current;p.lit=voltage>=4;
+ return {voltage,current,power:voltage*current};
+}
+function relayLiveData(p,V){
+ const P=p.id+".",voltage=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0)),resistance=relayCoilResistance(p),current=p.damaged||!componentEnabled(p)?0:voltage/resistance;
+ const now=performance.now(),last=Number(p.relayMotionAt)||now,dt=Math.max(.004,Math.min(.08,(now-last)/1000));p.relayMotionAt=now;
+ const rest=relayType(p)==="SPDT"?22:10,target=p.energized?-22:rest,previous=Number.isFinite(Number(p.relayAngle))?Number(p.relayAngle):rest;
+ p.relayAngle=previous+Math.sign(target-previous)*Math.min(Math.abs(target-previous),330*dt);
+ const plungerTarget=p.energized?11:0,plunger=Number(p.relayPlunger)||0;p.relayPlunger=plunger+Math.sign(plungerTarget-plunger)*Math.min(Math.abs(plungerTarget-plunger),85*dt);
+ p.coilVoltage=voltage;p.coilCurrent=current;p.actualVoltage=voltage;p.actualCurrent=current;p.actualPower=voltage*current;p.lit=!!p.energized;
+ return {voltage,current,contact:p.energized?"NO":relayType(p)==="SPDT"?"NC":"OPEN"};
+}
 function starterLiveData(p,V){
  const P=p.id+".",mode=starterFault(p),sVoltage=Math.abs((V[P+"S"]??0)-(V[P+"GND"]??0)),motorVoltage=Math.abs((V[P+"B"]??0)-(V[P+"GND"]??0));
  const now=performance.now(),last=Number(p.starterMotionAt)||now,dt=Math.max(.004,Math.min(.08,(now-last)/1000));p.starterMotionAt=now;
@@ -2795,13 +3195,18 @@ function detectElectricalFaults(R){
   for(const source of sources){
     const P=source.id+".",pins=source.type==="AC"?["A","B"]:source.type==="FLA_BATT"?["POS","NEG"]:["+","-"],r=pathResistance(R,P+pins[0],P+pins[1]);
     if(r===undefined||!isFinite(r)||r>.35)continue;
-    /* A cranking starter is intentionally a ~0.1 Ω high-current load, not a
-       short circuit.  Keep normal starter operation from blowing the source. */
+    /* A starter's pull-in/hold-in coils and its cranking motor are intentional
+       low-resistance loads.  They must never be classified as a dead short:
+       the prior rule only exempted B→GND after the bridge closed, so a healthy
+       S→GND solenoid could destroy the battery before the motor had time to
+       engage. */
+    const normalStarterSolenoid=S().parts.some(p=>p.type==="STARTER"&&p.startCommanded&&
+      branchIsInPath(R,P+pins[0],P+pins[1],p.id+".S",p.id+".GND",starterSolenoidLoadResistance(p),r));
     const normalStarterLoad=S().parts.some(p=>p.type==="STARTER"&&p.motorCircuitOn&&
       branchIsInPath(R,P+pins[0],P+pins[1],p.id+".B",p.id+".GND",starterMotorLoadResistance(p),r));
     const normalAnalyzerLoad=S().parts.some(p=>p.type==="BATT_ANALYZER"&&p.loadActive&&
       branchIsInPath(R,P+pins[0],P+pins[1],p.id+".RED",p.id+".BLACK",analyzerLoadResistance(p),r));
-    if(normalStarterLoad||normalAnalyzerLoad)continue;
+    if(normalStarterSolenoid||normalStarterLoad||normalAnalyzerLoad)continue;
     const volts=isBattery(source)?batteryTerminalVoltage(source):Math.max(0,+source.val||0),amps=volts/Math.max(.02,r);
     const fuse=S().parts.find(p=>p.type==="FUSE2"&&p.on&&branchIsInPath(R,P+pins[0],P+pins[1],p.id+".A",p.id+".B",.05,r));
     if(fuse){fuse.on=false;fuse.blown=true;fuse.damaged=true;registerCircuitFault(`⚠ ตรวจพบการลัดวงจร ~${amps.toFixed(0)} A — ฟิวส์ ${fuse.id} ขาดเพื่อป้องกันวงจร`,fuse);return true;}
@@ -2838,8 +3243,13 @@ function solveAll(){
    for(let pass=0;pass<10;pass++){
     let changed=false;
     S().parts.filter(p=>p.type==="RELAY").forEach(p=>{
-      const P=p.id+".",on=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0))>=9;
-      if(on!==!!p.energized){p.energized=on;changed=true;}
+      const P=p.id+".",wiredCoilV=Math.abs((V[P+"COIL+"]??0)-(V[P+"COIL-"]??0)),coilV=p.scanForce?12:wiredCoilV,was=!!p.energized;
+      /* Automotive relays pull in around 9 V but hold until the coil falls
+         below roughly 6.5 V.  The hysteresis prevents contact chatter when
+         the voltage sags under load. */
+      const on=componentEnabled(p)&&!p.damaged&&(p.scanForce|| (was?coilV>=6.5:coilV>=9));
+      p.coilVoltage=coilV;p.coilCurrent=coilV/relayCoilResistance(p);
+      if(on!==was){p.energized=on;changed=true;playUiSound("click",.65);}
     });
     S().parts.filter(p=>p.type==="STARTER").forEach(p=>{
       const P=p.id+".",s=Math.abs((V[P+"S"]??0)-(V[P+"GND"]??0)),b=Math.abs((V[P+"B"]??0)-(V[P+"GND"]??0)),mode=starterFault(p);
@@ -2889,7 +3299,7 @@ function solveAll(){
     if(p.type==="BULB"){const d=bulbLiveData(p,V);p.lit=!p.damaged&&d.voltage>=d.ratedV*.65;}
     if(p.type==="STARTER")starterLiveData(p,V);
     if(p.type==="RES")resistorLiveData(p,V);
-    if(p.type==="BUZZ")p.lit=powered(p,"+","-",8);if(p.type==="BELL")p.lit=powered(p,"A","B",8);if(p.type==="FAN")p.lit=powered(p,"A","B",8);});
+    if(p.type==="BUZZ")p.lit=powered(p,"+","-",8);if(p.type==="BELL")bellLiveData(p,V);if(p.type==="FAN")fanLiveData(p,V);if(p.type==="RELAY")relayLiveData(p,V);});
   /* ═ กระแสโดยประมาณต่อขา (สำหรับป้าย mA/A บนสายไฟ ให้ดูเหมือนวงจรจริงตามภาพตัวอย่าง) ═
      ใช้ผลต่างแรงดันคร่อมแต่ละแขนงต้านทาน / ค่า R ของแขนงนั้น แล้วสะสมไว้ที่ปลายขาแต่ละข้าง
      สายไฟ (ความต้านทาน 0) ที่ต่อจากขานั้นจะยืมค่ากระแสนี้ไปแสดงเป็นป้ายบนเส้นสาย */
@@ -2905,6 +3315,8 @@ function solveAll(){
     const net=wireNodeSet(w.a);let peak=0;net.forEach(node=>{peak=Math.max(peak,Number(PIN_I[node])||0);});
     if(peak>0){PIN_I[w.a]=Math.max(PIN_I[w.a]||0,peak);PIN_I[w.b]=Math.max(PIN_I[w.b]||0,peak);}
   });
+  S().parts.filter(p=>p.type==="PSU").forEach(p=>{const on=componentEnabled(p)&&!p.damaged,current=on?Math.max(Number(PIN_I[p.id+".+"])||0,Number(PIN_I[p.id+".-"])||0):0;p.actualVoltage=on?Math.max(0,Number(p.val)||0):0;p.actualCurrent=current;p.actualPower=p.actualVoltage*current;});
+  updateVehicleEngine(V);S().lastVoltage=V;
   return{V,R,topologyChanged};
 }
 
@@ -3621,42 +4033,45 @@ function buildScopeUnit(scope,root){
   const host=mk("g",{class:"scope-instance","data-instrument-id":scope.id});root.appendChild(host);
   host.setAttribute("transform",`translate(${scope.x},${scope.y})`);
   const g=host;
-  /* พื้นหลังตัวเครื่อง (ลากตรงนี้เพื่อย้าย) */
-  const body=mk("rect",{x:0,y:0,width:SCP.w,height:SCP.h,rx:12,fill:"#d7dc86",
-    stroke:"#9aa04a","stroke-width":2,class:"instrBody",opacity:.96});
+  /* Bench oscilloscope: dark metal chassis, recessed CRT/LCD-style screen
+     and a separate control bay, rather than the former flat yellow panel. */
+  const body=mk("rect",{x:0,y:0,width:SCP.w,height:SCP.h,rx:12,fill:"#414b53",
+    stroke:"#1a2329","stroke-width":2.5,class:"instrBody",opacity:.98});
   body.dataset.instr=scope.id;g.appendChild(body);
-  g.appendChild(mk("rect",{x:8,y:6,width:230,height:22,rx:6,fill:"#c7cdd6"}));
-  g.appendChild(mk("text",{x:16,y:21,"font-size":12,"font-weight":700,fill:"#2c3440"},"ออสซิลโลสโคป"));
+  g.appendChild(mk("rect",{x:8,y:6,width:230,height:22,rx:6,fill:"#252d33",stroke:"#66727a","stroke-width":1}));
+  g.appendChild(mk("text",{x:16,y:21,"font-size":11,"font-weight":800,fill:"#e7edf0","letter-spacing":.5},"AUTOLAB • DIGITAL OSCILLOSCOPE"));
+  g.appendChild(mk("text",{x:505,y:21,"text-anchor":"end","font-size":8.5,"font-weight":700,fill:"#b9c4c9"},"3 CH • 20 MHz"));
   /* จอกริด */
-  g.appendChild(mk("rect",{x:SCR.x,y:SCR.y,width:SCR.w,height:SCR.h,fill:"#0f9c86"}));
+  g.appendChild(mk("rect",{x:SCR.x-4,y:SCR.y-4,width:SCR.w+8,height:SCR.h+8,rx:5,fill:"#11191b",stroke:"#69757a","stroke-width":1.4}));
+  g.appendChild(mk("rect",{x:SCR.x,y:SCR.y,width:SCR.w,height:SCR.h,fill:"#06261e"}));
   const gridG=mk("g",{"data-scope-field":"grid","data-scope-id":scope.id});g.appendChild(gridG);
   for(let i=0;i<=10;i++)gridG.appendChild(mk("line",{x1:SCR.x+i*SCR.w/10,y1:SCR.y,
-    x2:SCR.x+i*SCR.w/10,y2:SCR.y+SCR.h,stroke:i===5?"#35b6a2":"#0c8674","stroke-width":i===5?1.3:1}));
+    x2:SCR.x+i*SCR.w/10,y2:SCR.y+SCR.h,stroke:i===5?"#4ecb93":"#16654e","stroke-width":i===5?1.3:1}));
   for(let i=0;i<=8;i++)gridG.appendChild(mk("line",{x1:SCR.x,y1:SCR.y+i*SCR.h/8,
-    x2:SCR.x+SCR.w,y2:SCR.y+i*SCR.h/8,stroke:i===4?"#35b6a2":"#0c8674","stroke-width":i===4?1.3:1}));
+    x2:SCR.x+SCR.w,y2:SCR.y+i*SCR.h/8,stroke:i===4?"#4ecb93":"#16654e","stroke-width":i===4?1.3:1}));
   g.appendChild(mk("rect",{x:SCR.x,y:SCR.y,width:SCR.w,height:SCR.h,fill:"none",
-    stroke:"#123","stroke-width":2}));
-  g.appendChild(mk("path",{"data-scope-field":"ref","data-scope-id":scope.id,fill:"none",stroke:"#0a4a3f","stroke-width":2,
+    stroke:"#0b1113","stroke-width":2}));
+  g.appendChild(mk("path",{"data-scope-field":"ref","data-scope-id":scope.id,fill:"none",stroke:"#5f9b6e","stroke-width":1.7,
     "stroke-dasharray":"6 4"}));
-  g.appendChild(mk("path",{"data-scope-field":"live","data-scope-id":scope.id,fill:"none",stroke:"#0d3b2f","stroke-width":2.3}));
+  g.appendChild(mk("path",{"data-scope-field":"live","data-scope-id":scope.id,fill:"none",stroke:"#a4f6a5","stroke-width":2.3}));
   /* ค่าวัดจริงจาก samples: Vpp, frequency, DC offset และ duty */
   g.appendChild(mk("text",{"data-scope-field":"pk","data-scope-id":scope.id,x:SCR.x,y:SCR.y+SCR.h+16,"font-size":9.5,
-    "font-family":"Consolas,monospace","font-weight":700,fill:"#2c3440"},"Vpp 0.00 V"));
+    "font-family":"Consolas,monospace","font-weight":700,fill:"#dde7e3"},"Vpp 0.00 V"));
   g.appendChild(mk("text",{"data-scope-field":"hz","data-scope-id":scope.id,x:SCR.x+80,y:SCR.y+SCR.h+16,"font-size":9.5,
-    "font-family":"Consolas,monospace","font-weight":700,fill:"#7d3fa8"},"Freq 0 Hz"));
+    "font-family":"Consolas,monospace","font-weight":700,fill:"#ffe07a"},"Freq 0 Hz"));
   g.appendChild(mk("text",{"data-scope-field":"off","data-scope-id":scope.id,x:SCR.x+161,y:SCR.y+SCR.h+16,"font-size":9.5,
-    "font-family":"Consolas,monospace","font-weight":700,fill:"#0c7466"},"Off 0.00 V"));
+    "font-family":"Consolas,monospace","font-weight":700,fill:"#8be9fd"},"Off 0.00 V"));
   g.appendChild(mk("text",{"data-scope-field":"duty","data-scope-id":scope.id,x:SCR.x+239,y:SCR.y+SCR.h+16,"font-size":9.5,
-    "font-family":"Consolas,monospace","font-weight":700,fill:"#a87d1a"},"Duty 0%"));
+    "font-family":"Consolas,monospace","font-weight":700,fill:"#f6a6d4"},"Duty 0%"));
   /* 3 ช่องสัญญาณ + จุดต่อโพรบแดง/ดำ ด้านบนตัวเครื่อง */
   Object.keys(CH_X).forEach(ch=>{
     const cx0=CH_X[ch],col=CH_COL[ch],active=ch===activeCh;
     /* กล่องหัวช่อง (คลิกเพื่อเลือกช่องที่แสดงผล) */
     const tabG=mk("g",{class:"no-drag",style:"cursor:pointer"});
     tabG.appendChild(mk("rect",{x:cx0-34,y:26,width:68,height:20,rx:6,
-      fill:active?col:"#eceff4",stroke:"#7c828c","stroke-width":1}));
+      fill:active?"#1c262b":"#303941",stroke:active?col:"#829098","stroke-width":1.2}));
     tabG.appendChild(mk("text",{x:cx0,y:40,"text-anchor":"middle","font-size":11,
-      "font-weight":700,fill:"#20262e"},ch));
+      "font-weight":700,fill:active?col:"#dce5e8"},ch));
     tabG.onpointerup=e=>{e.stopPropagation();engageScope(scope,()=>{activeCh=ch;scopeRefresh();});};
     g.appendChild(tabG);
     /* หัวโพรบแดง/ดำ ที่ยื่นออกเหนือตัวเครื่อง — ลากไปจับขาอุปกรณ์ได้ */
@@ -3672,15 +4087,15 @@ function buildScopeUnit(scope,root){
   });
   /* ═ แก้บัค: เดิมเป็นวงกลมตกแต่งเฉยๆ กดไม่ได้ ไม่มีผลต่อการแสดงผลเลย
      ตอนนี้ TIME/DIV และ VOLTS/DIV กดแล้วปรับสเกลจอจริง (คลิกวนค่าไปเรื่อยๆ) ═ */
-  g.appendChild(mk("rect",{x:346,y:150,width:160,height:112,rx:8,fill:"#eceff4",stroke:"#9aa04a"}));
-  g.appendChild(mk("text",{x:388,y:166,"text-anchor":"middle","font-size":9.5,"font-weight":700,fill:"#2c3440"},"TIME/DIV"));
-  g.appendChild(mk("text",{x:464,y:166,"text-anchor":"middle","font-size":9.5,"font-weight":700,fill:"#2c3440"},"VOLTS/DIV"));
-  g.appendChild(mk("text",{x:356,y:246,"font-size":9.5,fill:"#4a5560"},"Probes: Differential"));
-  g.appendChild(mk("text",{x:356,y:258,"font-size":9,fill:"#4a5560"},"จอ 10×8 div • 3 ช่อง"));
+  g.appendChild(mk("rect",{x:346,y:150,width:160,height:112,rx:8,fill:"#252d33",stroke:"#151c21","stroke-width":1.4}));
+  g.appendChild(mk("text",{x:388,y:166,"text-anchor":"middle","font-size":9.5,"font-weight":700,fill:"#d9e2e5"},"TIME/DIV"));
+  g.appendChild(mk("text",{x:464,y:166,"text-anchor":"middle","font-size":9.5,"font-weight":700,fill:"#d9e2e5"},"VOLTS/DIV"));
+  g.appendChild(mk("text",{x:356,y:246,"font-size":9.5,fill:"#aebbc1"},"INPUT: Differential"));
+  g.appendChild(mk("text",{x:356,y:258,"font-size":9,fill:"#8d9aa1"},"10×8 DIV • 3 CHANNEL"));
   const dial=(cx,cy,label,onClick)=>{
     const dg=mk("g",{class:"no-drag",style:"cursor:pointer"});
-    dg.appendChild(mk("circle",{cx,cy,r:24,fill:"#5c78a8",stroke:"#33445e","stroke-width":3}));
-    dg.appendChild(mk("circle",{cx,cy,r:16,fill:"#7d94c2"}));
+    dg.appendChild(mk("circle",{cx,cy,r:24,fill:"#151d22",stroke:"#0a1014","stroke-width":3}));
+    dg.appendChild(mk("circle",{cx,cy,r:16,fill:"#59666d",stroke:"#89979d","stroke-width":1}));
     dg.appendChild(mk("text",{x:cx,y:cy+4,"text-anchor":"middle","font-size":10,
       "font-weight":700,fill:"#fff"},label));
     dg.onpointerup=e=>{e.stopPropagation();engageScope(scope,()=>{onClick();scopeRefresh();});};
@@ -3690,12 +4105,12 @@ function buildScopeUnit(scope,root){
   dial(388,200,TDIV_STEPS[tdivI]+"ms",()=>{tdivI=(tdivI+1)%TDIV_STEPS.length;});
   dial(464,200,VDIV_STEPS[vdivI]+"V",()=>{vdivI=(vdivI+1)%VDIV_STEPS.length;});
   const pos=mk("g",{class:"no-drag",style:"cursor:pointer"});
-  pos.appendChild(mk("rect",{x:352,y:267,width:104,height:22,rx:5,fill:"#5c78a8",stroke:"#33445e"}));
+  pos.appendChild(mk("rect",{x:352,y:267,width:104,height:22,rx:5,fill:"#36444c",stroke:"#0e171c"}));
   pos.appendChild(mk("text",{x:404,y:282,"text-anchor":"middle","font-size":9,"font-weight":700,fill:"#fff"},`VERT POS ${scopePosDiv>0?"+":""}${scopePosDiv} div`));
   pos.onpointerup=e=>{e.stopPropagation();engageScope(scope,()=>{scopePosDiv=scopePosDiv>=3?-3:scopePosDiv+1;scopeRefresh();});};g.appendChild(pos);
   const auto=mk("g",{class:"no-drag",style:"cursor:pointer"});
-  auto.appendChild(mk("rect",{x:461,y:267,width:38,height:22,rx:5,fill:"#e6edf3",stroke:"#7c828c"}));
-  auto.appendChild(mk("text",{x:480,y:282,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#2c3440"},"AUTO"));
+  auto.appendChild(mk("rect",{x:461,y:267,width:38,height:22,rx:5,fill:"#4f7b55",stroke:"#18261b"}));
+  auto.appendChild(mk("text",{x:480,y:282,"text-anchor":"middle","font-size":8.5,"font-weight":700,fill:"#eff8ef"},"AUTO"));
   auto.onpointerup=e=>{e.stopPropagation();engageScope(scope,()=>{scopePosDiv=0;scopeRefresh();});};g.appendChild(auto);
 }
 /* 7.2 อัปเดตรูปคลื่นบนจอ (SVG path) */
@@ -3733,12 +4148,16 @@ function scopeMetrics(samples,knownHz){
 /* ═══════════════════════════════════════════════════════════
    ขั้นที่ 8 : กล่องอุปกรณ์ / สไลด์ / แผงข้อมูล
    ═══════════════════════════════════════════════════════════ */
+/* Place measuring instruments first so they are immediately available without
+   scrolling past the component library. */
+addInstrumentPaletteItem("DMM","มัลติมิเตอร์");
+addInstrumentPaletteItem("SCOPE","ออสซิลโลสโคป");
 Object.entries(DEF).forEach(([k,d])=>{
  const el=document.createElement("div");el.className="pi";
  el.innerHTML=`<div class="ic"></div><div class="nm">${d.nm}</div>`;
  const preview=document.createElementNS(NS,"svg");preview.setAttribute("viewBox","0 0 36 32");
  const sample={type:k,val:CTRL[k]?CTRL[k][3]:0,on:true,energized:true,lit:true};
- const art=partIcon(sample);art.setAttribute("transform","translate(2,1) scale(1.08)");preview.appendChild(art);
+ const art=k==="STARTER"?starterPaletteIcon():partIcon(sample);art.setAttribute("transform","translate(2,1) scale(1.08)");preview.appendChild(art);
  el.querySelector(".ic").appendChild(preview);
  el.onclick=()=>{document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));
    wireToolArmed=false;instrumentArm=null;arm=k;el.classList.add("arm");stage.style.cursor="crosshair";updateToolbarStates();};
@@ -3747,16 +4166,17 @@ Object.entries(DEF).forEach(([k,d])=>{
    tap/click the Canvas to place it; a close button hides it and the matching
    move button lets the user reposition it without grabbing the instrument
    body.  The existing measurement engine remains available immediately. */
-function addInstrumentPaletteItem(kind,name,icon){
+function addInstrumentPaletteItem(kind,name){
  const el=document.createElement("div");el.className="pi instrument-palette-item";
- el.innerHTML=`<div class="ic" style="font-size:29px;line-height:34px">${icon}</div><div class="nm">${name}</div>`;
+ const preview=kind==="DMM"
+  ?`<svg viewBox="0 0 54 38" aria-hidden="true"><rect x="14" y="1" width="25" height="36" rx="6" fill="#16858b" stroke="#0b4f55" stroke-width="2"/><rect x="18" y="5" width="17" height="10" rx="2" fill="#dcebdd" stroke="#25383a"/><circle cx="26.5" cy="24" r="6.5" fill="#30383a" stroke="#111"/><path d="M26.5 24 L29 19" stroke="#f6d03e" stroke-width="1.5"/><circle cx="21" cy="33" r="2" fill="#202020"/><circle cx="32" cy="33" r="2" fill="#d33333"/></svg>`
+  :`<svg viewBox="0 0 54 38" aria-hidden="true"><rect x="1" y="5" width="52" height="28" rx="4" fill="#404850" stroke="#1d252b" stroke-width="2"/><rect x="5" y="9" width="29" height="19" rx="2" fill="#08291f" stroke="#0e7461"/><path d="M6 21 L12 16 L17 24 L23 13 L29 20 L33 18" fill="none" stroke="#92f2a1" stroke-width="1.4"/><circle cx="41" cy="15" r="3" fill="#60717a"/><circle cx="48" cy="15" r="3" fill="#60717a"/><rect x="38" y="22" width="12" height="4" rx="1" fill="#2a3238"/></svg>`;
+ el.innerHTML=`<div class="ic instrument-preview">${preview}</div><div class="nm">${name}</div>`;
  el.title=`เลือก ${name} แล้วคลิกบน Canvas เพื่อวาง`;
  el.onclick=()=>{document.querySelectorAll(".pi").forEach(x=>x.classList.remove("arm"));
   arm=null;wireToolArmed=false;instrumentArm=kind;el.classList.add("arm");stage.style.cursor="crosshair";showToast(`เลือก ${name} — คลิกบน Canvas เพื่อวาง`);updateToolbarStates();};
  $("palette").appendChild(el);
 }
-addInstrumentPaletteItem("DMM","มัลติมิเตอร์","🔧");
-addInstrumentPaletteItem("SCOPE","ออสซิลโลสโคป","📈");
 Object.entries(FAULTS).forEach(([k,v])=>$("selFault").add(new Option(v,k)));
 $("selFault").onchange=()=>{const p=sel&&findP(sel);if(!p||!REQ[p.type])return;
  snap();p.fault=$("selFault").value;render();};
@@ -3979,6 +4399,22 @@ function buildInspector(){
     ขั้วจ่ายไฟ: <span id="ignitionOutputs">${["ACC","IGN","ST"].filter(pin=>ignitionFeeds(p,pin)).join(" / ")||"—"}</span></div>
    <div style="display:flex;gap:6px;margin-top:7px"><button class="tb" id="btnIgnitionCycle" type="button" style="padding:5px 8px">↻ หมุนตำแหน่งถัดไป</button><button class="tb" id="btnIgnitionStart" type="button" style="padding:5px 8px">⏻ กดค้าง START</button></div></div>`;
  }
+ if(p.type==="OBD2"){
+  const status=diagnosticDlcStatus();
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">OBD2 DLC 16-pin</div><div style="font-size:11px;color:#5c6874;line-height:1.65">ต่อ Pin 16 → B+ • Pin 4/5 → GND • Pin 6 → ECU CAN-H • Pin 14 → ECU CAN-L<br>สถานะ: <b style="color:${status.ok?"#0a7d3f":"#b54708"}">${status.reason}</b></div></div>`;
+ }
+ if(p.type==="VCI"){
+  const dlc=p.dlcId&&findP(p.dlcId),status=diagnosticDlcStatus();
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">หัวอ่าน VCI Bluetooth</div><div style="font-size:11px;color:#5c6874;line-height:1.65">${dlc?`เชื่อมกับ DLC: <b>${dlc.id}</b>`:"ยังไม่เสียบกับ DLC"}<br>สถานะเครือข่าย: <b style="color:${status.ok?"#0a7d3f":"#b54708"}">${status.reason}</b></div><button class="tb" id="btnVciConnect" type="button" style="margin-top:7px;padding:5px 8px">${dlc?"ถอด VCI":"เสียบ VCI เข้าปลั๊กใกล้สุด"}</button></div>`;
+ }
+ if(p.type==="LAUNCH"){
+  const status=diagnosticDlcStatus();
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">Launch X431 Diagnostic Scanner</div><div style="font-size:11px;color:#5c6874;line-height:1.65">ใช้ปุ่มบนหน้าจอแท็บเล็ตเพื่อเปิดเครื่อง สแกน VIN อ่าน DTC, Live Data และ Active Test<br>สถานะ: <b style="color:${status.ok?"#0a7d3f":"#b54708"}">${status.reason}</b></div></div>`;
+ }
+ if(p.type==="CLUSTER"){
+  const engine=ensureEngineState(),status=clusterWiringStatus(p);
+  html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">หน้าปัดเรือนไมล์</div><div class="fld"><label>ระบบชาร์จ</label><select id="clusterAltFault"><option value="OK" ${!engine.alternatorFault?"selected":""}>ปกติ (13.8–14.4 V)</option><option value="FAULT" ${engine.alternatorFault?"selected":""}>ไดชาร์จ/สายพานเสีย</option></select></div><div style="font-size:11px;color:#5c6874;line-height:1.65">ไฟเลี้ยงหน้าปัด: <b id="clusterPower" style="color:${status.powered?"#0a7d3f":"#b54708"}">${status.powered?"พร้อม":"รอ IG1 และ GND"}</b><br>RPM: <b id="clusterLiveRpm">${Math.round(engine.rpm||0)} rpm</b> • MIL: <b id="clusterLiveMil">${engine.mil?"ON":"OFF"}</b></div></div>`;
+ }
  if(p.type==="STARTER"){
   const mode=starterFault(p),modeMeta=STARTER_FAULTS[mode];
   html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">มอเตอร์สตาร์ทและโซลีนอยด์</div>
@@ -3995,7 +4431,7 @@ function buildInspector(){
     รอบหมุน: <b id="starterRpm">${Math.round(p.rpm||0)} rpm</b><br>
     Bendix: <b id="starterBendix" style="color:${p.solenoidEngaged?"#0a7d3f":"#6b7784"}">${p.solenoidEngaged?"ดันออก / ขบเฟือง":"หดกลับ"}</b><br>
     สถานะ: <b id="starterState" style="color:${p.overload?"#b42318":p.motorSpinning?"#0a7d3f":"#6b7784"}">${p.overload?"⚠ โหลดเกิน / Locked Rotor":p.motorSpinning?"กำลังหมุน":"รอไฟ S, B และ GND"}</b><br>
-    <span style="font-size:10px;color:#6b7784">จุดทดสอบ Cutaway: S–C Pull-in 0.20–0.50 Ω • S–Body Hold-in 0.50–1.20 Ω • C–BR+ Field coil • BR−–Body ต้อง OL</span></div></div>`;
+    <span style="font-size:10px;color:#6b7784">ขั้วต่อภายนอก: S / Terminal 50 • B / Terminal 30 • GND / Body Ground</span></div></div>`;
  }
  if(isBattery(p)){
   const capValue=batteryCapacityDisplay(p),unit=batteryCapacityUnit(p),flooded=isFloodedBattery(p),fault=floodedBatteryFault(p),eye=floodedMagicEye(p),maxCurrent=flooded?floodedRatedCca(p):batteryMaxCurrent(p);
@@ -4052,11 +4488,12 @@ function buildInspector(){
    const isSpdt=relayType(p)==="SPDT";
    html+=`<div class="insp" style="padding:8px;margin-top:9px"><div class="t">ชนิดรีเลย์</div>
     <div class="fld"><label>หน้าสัมผัส</label><select id="relayType"><option value="SPST" ${!isSpdt?"selected":""}>รีเลย์ 4 ขา (SPST)</option><option value="SPDT" ${isSpdt?"selected":""}>รีเลย์ 5 ขา (SPDT)</option></select></div>
-    <div style="font-size:11px;color:#6b7784;line-height:1.55">ขั้วที่ใช้งาน: <b>Coil+ / Coil− / COM / NO${isSpdt?" / NC":""}</b>${!isSpdt?"<br>รุ่น SPST ไม่มีขา NC":""}</div></div>
-    <div style="font-size:11px;color:#6b7784">คอยล์ (85-86): <b style="color:${p.energized?"#0a7d3f":"#c0392b"}">
-    ${p.energized?"ทำงาน (พลังงานครบวงจร)":"ไม่ทำงาน"}</b><br>
-    ขา 30 (COM) ต่อกับ <b style="color:${p.energized?"#0a7d3f":"#8b949e"}">ขา 87 (NO)</b> ${p.energized?"◀ ปัจจุบัน":""}
-    ${isSpdt?`/ <b style="color:${!p.energized?"#0a7d3f":"#8b949e"}">ขา 87a (NC)</b> ${!p.energized?"◀ ปัจจุบัน":""}`:""}</div>`;
+    <div style="font-size:11px;color:#6b7784;line-height:1.55">ขั้วที่ใช้งาน: <b>Coil+ / Coil− / COM / NO${isSpdt?" / NC":""}</b>${!isSpdt?"<br>รุ่น SPST ไม่มีขา NC — ขา 30 จะเปิดเมื่อคอยล์ไม่ทำงาน":""}</div></div>
+    <div style="font-size:11px;color:#6b7784;line-height:1.65">แรงดันคอยล์ 85–86: <b id="relayCoilV">${fmtV(p.coilVoltage||0)}</b> • กระแส: <b id="relayCoilI">${fmtmA(p.coilCurrent||0)}</b><br>
+    จุดดูด / จุดปล่อย: <b>≥ 9.0 V / &lt; 6.5 V</b> (ป้องกันหน้าสัมผัสสั่น)<br>
+    คอยล์: <b id="relayCoilState" style="color:${p.energized?"#0a7d3f":"#c0392b"}">${p.energized?"ดูดทำงาน (Energised)":"พัก / สปริงดันกลับ"}</b><br>
+    ขา 30 (COM) ต่อกับ <b id="relayNoState" style="color:${p.energized?"#0a7d3f":"#8b949e"}">ขา 87 (NO)</b> <span id="relayNoMark">${p.energized?"◀ ปัจจุบัน":""}</span>
+    ${isSpdt?`/ <b id="relayNcState" style="color:${!p.energized?"#0a7d3f":"#8b949e"}">ขา 87a (NC)</b> <span id="relayNcMark">${!p.energized?"◀ ปัจจุบัน":""}</span>`:""}</div>`;
   }
   if(p.type==="LEDp"){
    const spec=ledSpec(p),colors=Object.entries(LED_SPECS).map(([key,item])=>
@@ -4099,6 +4536,8 @@ function buildInspector(){
  if($("ignitionStage"))$("ignitionStage").onchange=e=>{snap();setIgnitionStage(p,e.target.value);playUiSound("click");render();};
  if($("btnIgnitionCycle"))$("btnIgnitionCycle").onclick=()=>{snap();cycleIgnitionStage(p);playUiSound("click");render();};
  if($("btnIgnitionStart"))$("btnIgnitionStart").onpointerdown=e=>{e.preventDefault();snap();ignitionStartHold=p;setIgnitionStage(p,"START",false);playUiSound("click");render();};
+ if($("btnVciConnect"))$("btnVciConnect").onclick=()=>toggleVciConnection(p);
+ if($("clusterAltFault"))$("clusterAltFault").onchange=e=>{snap();ensureEngineState().alternatorFault=e.target.value==="FAULT";render();};
  if($("starterFault"))$("starterFault").onchange=e=>{snap();p.starterFault=STARTER_FAULTS[e.target.value]?e.target.value:"NORMAL";
   p.startCommanded=false;p.motorCircuitOn=false;p.motorSpinning=false;p.solenoidEngaged=false;p.contactClosed=false;p.cranking=false;p.bendixPosition=0;p.plungerPosition=0;p.rotorRpm=0;p.overload=false;p.overloadAlerted=false;render();};
  if($("starterPullR")&&$("starterHoldR")&&$("starterMotorR")){
@@ -4242,6 +4681,18 @@ function updateLivePropertyPanel(){
   if(state){state.textContent=IGNITION_STAGE_LABEL[stage];state.style.color=stage==="LOCK"?"#c0392b":stage==="START"?"#b54708":"#0a7d3f";}
   if(outputs)outputs.textContent=["ACC","IGN","ST"].filter(pin=>ignitionFeeds(p,pin)).join(" / ")||"—";
  }
+ if(p.type==="CLUSTER"){
+  const engine=ensureEngineState(),status=clusterWiringStatus(p,S().lastVoltage||{}),power=$("clusterPower");
+  if(power){power.textContent=status.powered?"พร้อม":"รอ IG1 และ GND";power.style.color=status.powered?"#0a7d3f":"#b54708";}
+  set("clusterLiveRpm",`${Math.round(engine.rpm||0)} rpm`);set("clusterLiveMil",engine.mil?"ON":"OFF");
+ }
+ if(p.type==="RELAY"){
+  const energized=!!p.energized,spdt=relayType(p)==="SPDT",coilState=$("relayCoilState"),noState=$("relayNoState"),ncState=$("relayNcState"),noMark=$("relayNoMark"),ncMark=$("relayNcMark");
+  set("relayCoilV",fmtV(p.coilVoltage||0));set("relayCoilI",fmtmA(p.coilCurrent||0));
+  if(coilState){coilState.textContent=energized?"ดูดทำงาน (Energised)":"พัก / สปริงดันกลับ";coilState.style.color=energized?"#0a7d3f":"#c0392b";}
+  if(noState)noState.style.color=energized?"#0a7d3f":"#8b949e";if(noMark)noMark.textContent=energized?"◀ ปัจจุบัน":"";
+  if(ncState)ncState.style.color=!energized&&spdt?"#0a7d3f":"#8b949e";if(ncMark)ncMark.textContent=!energized&&spdt?"◀ ปัจจุบัน":"";
+ }
  if(p.type==="APP"){
   const one=Number(p.aps1Voltage)||0,two=Number(p.aps2Voltage)||0,ratio=two>.001?one/two:0,limp=!!p.appLimpMode;
   set("appAps1",fmtV(one));set("appAps2",fmtV(two));set("appRatio",two>.001?`${ratio.toFixed(2)}:1`:"—");
@@ -4311,15 +4762,52 @@ function updateDynamicCanvas(V){
   const lines=analyzerScreenLines(p),main=partL.querySelector(`.analyzer-lcd-main[data-analyzer-id="${p.id}"]`),sub=partL.querySelector(`.analyzer-lcd-sub[data-analyzer-id="${p.id}"]`);
   if(main)main.textContent=lines.main;if(sub)sub.textContent=lines.sub;
  });
+ S().parts.filter(p=>p.type==="FAN").forEach(p=>{
+  const rotor=partL.querySelector(`.fan-rotor[data-part-id="${p.id}"]`);if(!rotor)return;
+  rotor.setAttribute("transform",`rotate(${Number(p.fanAngle)||0} 15 15)`);
+  rotor.setAttribute("opacity",p.lit?"1":".56");
+ });
+ S().parts.filter(p=>p.type==="BELL").forEach(p=>{
+  const hammer=partL.querySelector(`.bell-hammer[data-part-id="${p.id}"]`);if(!hammer)return;
+  const twitch=p.lit?Math.sin(performance.now()*.052)*7:0;hammer.setAttribute("transform",`rotate(${twitch} 15 21)`);
+ });
+ S().parts.filter(p=>p.type==="RELAY").forEach(p=>{
+  const root=partL.querySelector(`g[data-pid="${p.id}"]`);if(!root)return;
+  const energized=!!p.energized,armature=root.querySelector(`.relay-armature[data-relay-id="${p.id}"]`),plunger=root.querySelector(`.relay-plunger[data-relay-id="${p.id}"]`),glow=root.querySelector(`.relay-coil-glow[data-relay-id="${p.id}"]`),state=root.querySelector(`.relay-state-text[data-relay-id="${p.id}"]`),status=root.querySelector(`.relay-live-status[data-relay-id="${p.id}"]`);
+  if(armature)armature.setAttribute("transform",`rotate(${Number(p.relayAngle)||0} 123 59)`);
+  if(plunger)plunger.setAttribute("transform",`translate(${Number(p.relayPlunger)||0} 0)`);
+  if(glow)glow.setAttribute("opacity",energized?String(.16+Math.min(.22,(Number(p.coilVoltage)||0)/40)):".03");
+  root.querySelectorAll(`.relay-fixed-contact[data-relay-id="${p.id}"]`).forEach(contact=>{const on=(contact.getAttribute("data-relay-contact")==="NO"&&energized)||(contact.getAttribute("data-relay-contact")==="NC"&&!energized);contact.setAttribute("fill",on?"#e8b84e":"#a16d28");});
+  if(state){state.textContent=energized?"COIL ENERGISED":"COIL REST";state.setAttribute("fill",energized?"#0a7d3f":"#59666a");}
+  if(status){const circles=status.querySelectorAll("circle");if(circles[0]){circles[0].setAttribute("fill",energized?"#55d883":"#d8dee1");circles[0].setAttribute("stroke",energized?"#147a3d":"#85939a");}if(circles[1])circles[1].setAttribute("fill",energized?"#eaffd7":"#f5f7f8");}
+ });
+ S().parts.filter(p=>p.type==="CLUSTER").forEach(p=>{
+  const root=partL.querySelector(`g[data-pid="${p.id}"]`);if(!root)return;const status=clusterWiringStatus(p,V),engine=ensureEngineState(),powered=status.powered,rpm=powered?Number(engine.rpm)||0:0,target=-120+Math.max(0,Math.min(8000,rpm))/8000*240,current=Number.isFinite(Number(p.clusterNeedle))?Number(p.clusterNeedle):-120;
+  p.clusterPowered=powered;p.clusterNeedle=current+Math.sign(target-current)*Math.min(Math.abs(target-current),520/60);
+  const needle=root.querySelector(`.cluster-tach-needle[data-cluster-id="${p.id}"]`),display=root.querySelector(`.cluster-rpm[data-cluster-id="${p.id}"]`);if(needle)needle.setAttribute("transform",`rotate(${p.clusterNeedle} 88 68)`);if(display){display.textContent=String(Math.round(rpm)).padStart(4,"0");display.setAttribute("fill",powered?"#183b2b":"#637078");}
+  const bulbCheck=powered&&!engine.running,cranking=powered&&status.stage==="START",mil=bulbCheck||!!engine.mil,battery=bulbCheck||(engine.running&&!!engine.alternatorFault),oil=bulbCheck&&!cranking;
+  [[".cluster-mil",mil],[".cluster-batt",battery],[".cluster-oil",oil]].forEach(([selector,on])=>{const el=root.querySelector(selector);if(el)el.setAttribute("opacity",on?"1":".10");});
+ });
+ S().parts.filter(p=>p.type==="LAUNCH").forEach(p=>{
+  const root=partL.querySelector(`g[data-pid="${p.id}"]`);if(!root)return;const connection=diagnosticDlcStatus(V),engine=ensureEngineState(),maf=S().parts.find(x=>x.type==="MAF"),map=S().parts.find(x=>x.type==="MAP"),app=S().parts.find(x=>x.type==="APP"),dtcs=diagnosticDtcs();
+  const values={RPM:`${Math.round(engine.rpm||0)} rpm`,VOLT:`${Number(engine.systemVoltage||0).toFixed(2)} V`,MAF:maf?`${(.5+4*Math.max(0,Math.min(100,Number(maf.val)||0))/100).toFixed(2)} V`:"—",MAP:map?`${Math.round(Number(map.val)||0)} kPa`:"—",APP:app?`${Number(app.aps1Voltage||0).toFixed(2)} / ${Number(app.aps2Voltage||0).toFixed(2)} V`:"—",DTC:dtcs.length?dtcs.slice(0,2).map(x=>x.code).join(" • "):"NO DTC — ระบบปกติ",MIL:`MIL: ${engine.mil?"ON":"OFF"}   Stored: ${dtcs.length}`};
+  root.querySelectorAll("[data-launch-field]").forEach(el=>{const key=el.getAttribute("data-launch-field");if(key in values){el.textContent=connection.ok?values[key]:"COMM LOST";el.setAttribute("fill",connection.ok?(key==="DTC"&&dtcs.length?"#b42318":"#075c83"):"#b42318");}});
+ });
+ S().parts.filter(p=>p.type==="PSU").forEach(p=>{
+  const root=partL.querySelector(`g[data-pid="${p.id}"]`);if(!root)return;
+  const on=componentEnabled(p)&&!p.damaged,current=root.querySelector(`[data-psu-field="current"][data-psu-id="${p.id}"]`),voltage=root.querySelector(`[data-psu-field="voltage"][data-psu-id="${p.id}"]`);
+  if(current){current.textContent=(Number(p.actualCurrent)||0).toFixed(2);current.setAttribute("fill",on?"#ff5959":"#632a2a");}
+  if(voltage){voltage.textContent=(Number(p.actualVoltage)||0).toFixed(2);voltage.setAttribute("fill",on?"#baff48":"#385117");}
+ });
  S().parts.filter(p=>p.type==="STARTER").forEach(p=>{
   const angle=Number(p.rotorAngle)||0,bendixPosition=Math.max(0,Math.min(1,Number(p.bendixPosition)||0)),plunger=Math.max(0,Math.min(1,Number(p.plungerPosition)||0)),spinning=Number(p.rotorRpm)||0;
   const armature=partL.querySelector(`.starter-armature[data-part-id="${p.id}"]`),commutator=partL.querySelector(`.starter-commutator[data-part-id="${p.id}"]`),bendix=partL.querySelector(`.starter-bendix-large[data-part-id="${p.id}"]`),plungerEl=partL.querySelector(`.starter-plunger[data-part-id="${p.id}"]`),bridge=partL.querySelector(`.starter-contact-bridge[data-part-id="${p.id}"]`),lever=partL.querySelector(`.starter-shift-lever[data-part-id="${p.id}"]`),sparks=partL.querySelector(`.starter-brush-sparks[data-part-id="${p.id}"]`);
-  if(armature)armature.setAttribute("transform",`rotate(${angle} 112 68)`);
-  if(commutator)commutator.setAttribute("transform",`rotate(${angle} 72 68)`);
-  if(bendix)bendix.setAttribute("transform",`translate(${bendixPosition*18} 0) rotate(${angle*2} 218 68)`);
-  if(plungerEl)plungerEl.setAttribute("transform",`translate(${-plunger*15} 0)`);
-  if(bridge){bridge.setAttribute("transform",`translate(${-plunger*15} 0)`);const contact=bridge.querySelector("rect");if(contact)contact.setAttribute("fill",p.contactClosed?"#e19b42":"#8d6435");}
-  if(lever)lever.setAttribute("transform",`rotate(${-bendixPosition*23} 177 51)`);
+  if(armature)armature.setAttribute("transform",`rotate(${angle} 154 69)`);
+  if(commutator)commutator.setAttribute("transform",`rotate(${angle} 202 69)`);
+  if(bendix)bendix.setAttribute("transform",`translate(${-bendixPosition*16} 0) rotate(${angle*2} 31 69)`);
+  if(plungerEl)plungerEl.setAttribute("transform",`translate(${-plunger*12} 0)`);
+  if(bridge){bridge.setAttribute("transform",`translate(${-plunger*12} 0)`);const contact=bridge.querySelector("rect");if(contact)contact.setAttribute("fill",p.contactClosed?"#e6a23f":"#8b6334");}
+  if(lever)lever.setAttribute("transform",`rotate(${bendixPosition*28} 87 51)`);
   if(sparks)sparks.setAttribute("opacity",spinning>25?".9":"0");
  });
 }
@@ -4329,15 +4817,17 @@ function updateDynamicCanvas(V){
    ═══════════════════════════════════════════════════════════ */
 function loop(){
  const {V,R,topologyChanged}=solveAll();
+ const scannerPageChanged=updateScannerState();
  const editingProperties=inspectorInteractionActive(),canvasInteraction=!!wireDrag||!!wiring||!!drag;
  /* Do not rebuild the whole SVG on every animation frame.  Recreating the
     dashed-current paths repeatedly restarted their CSS animation and made a
     completed circuit appear to pulse or run erratically.  Live layers below
     update in place; render() is reserved for an actual topology/state change. */
  updateDynamicCanvas(V);
- if(topologyChanged&&!editingProperties&&!canvasInteraction)render();
+ if((topologyChanged||scannerPageChanged)&&!editingProperties&&!canvasInteraction)render();
  syncBuzzerAudio(V);
  syncStarterAudio();
+ syncEngineAudio();
  updateLivePropertyPanel();
  let activeHint="";
  dmmInstances().forEach(meter=>withDmm(meter,()=>{
